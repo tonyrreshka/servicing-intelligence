@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Servicing Engineering — Scope</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F5F3EE;
+    --surface: #FFFFFF;
+    --border: rgba(0,0,0,0.08);
+    --border-strong: rgba(0,0,0,0.14);
+    --text-primary: #111110;
+    --text-secondary: #6B6A65;
+    --text-tertiary: #A09F9A;
+    --d0-bg: #EBF3FC; --d0-border: #BDD6F2; --d0-text: #1A4E82; --d0-tag: #C8DEFA;
+    --d1-bg: #E3F5EE; --d1-border: #A8DFC8; --d1-text: #0D5C44; --d1-tag: #B8EDD8;
+    --d2-bg: #FDF0DC; --d2-border: #F5CB80; --d2-text: #7A4510; --d2-tag: #FBDDA0;
+    --d3-bg: #EEEEFE; --d3-border: #CCCAF8; --d3-text: #3D3798; --d3-tag: #D8D6FC;
+    --d4-bg: #FCEEE8; --d4-border: #F2BCA4; --d4-text: #7A2810; --d4-tag: #FAC9B4;
+    --d5-bg: #FCEAF2; --d5-border: #F0BAD4; --d5-text: #7A1840; --d5-tag: #F8C8DE;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    min-height: 100vh;
+    padding: 48px 32px 80px;
+  }
+
+  .page-header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  .page-header .eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    margin-bottom: 10px;
+  }
+
+  .page-header h1 {
+    font-size: 32px;
+    font-weight: 300;
+    letter-spacing: -.02em;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+  }
+
+  .page-header .sub {
+    font-size: 13px;
+    color: var(--text-tertiary);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .card {
+    background: var(--surface);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    transition: box-shadow .2s;
+  }
+
+  .card:hover { box-shadow: 0 4px 24px rgba(0,0,0,.06); }
+
+  .card-header {
+    padding: 16px 18px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .card-header-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .domain-title {
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.3;
+  }
+
+  .edit-domain-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-tertiary);
+    font-size: 13px;
+    padding: 0;
+    line-height: 1;
+    opacity: 0;
+    transition: opacity .15s;
+  }
+
+  .card:hover .edit-domain-btn { opacity: 1; }
+  .edit-domain-btn:hover { color: var(--text-secondary); }
+
+  .ns-block {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .ns-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .ns-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: .08em;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    min-width: 22px;
+  }
+
+  .ns-pill {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: opacity .15s;
+    line-height: 1.4;
+  }
+
+  .ns-pill:hover { opacity: .75; }
+
+  .card-body { padding: 6px 0 10px; }
+
+  .cap-item {
+    padding: 8px 18px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    transition: background .12s;
+    position: relative;
+  }
+
+  .cap-item:last-child { border-bottom: none; }
+  .cap-item:hover { background: var(--bg); }
+
+  .cap-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .cap-name {
+    font-size: 12px;
+    color: var(--text-primary);
+    font-weight: 400;
+    flex: 1;
+  }
+
+  .cap-edit-btn {
+    background: none;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--text-tertiary);
+    font-size: 10px;
+    padding: 1px 6px;
+    opacity: 0;
+    transition: opacity .12s;
+    white-space: nowrap;
+  }
+
+  .cap-item:hover .cap-edit-btn { opacity: 1; }
+  .cap-edit-btn:hover { background: var(--bg); color: var(--text-secondary); }
+
+  .cap-impact {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .cap-impact::before {
+    content: '↗';
+    font-size: 10px;
+    color: var(--text-tertiary);
+  }
+
+  .cap-note {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    margin-top: 2px;
+    font-style: italic;
+    line-height: 1.4;
+  }
+
+  .add-cap-btn {
+    width: calc(100% - 36px);
+    margin: 4px 18px 0;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    padding: 5px;
+    border: 1px dashed var(--border-strong);
+    border-radius: 8px;
+    cursor: pointer;
+    background: transparent;
+    font-family: 'DM Sans', sans-serif;
+    transition: background .12s, color .12s;
+  }
+
+  .add-cap-btn:hover { background: var(--bg); color: var(--text-secondary); }
+
+  /* color themes */
+  .d0 .card-header { background: var(--d0-bg); border-color: var(--d0-border); }
+  .d0 .domain-title { color: var(--d0-text); }
+  .d0 .ns-pill { background: var(--d0-tag); color: var(--d0-text); }
+
+  .d1 .card-header { background: var(--d1-bg); border-color: var(--d1-border); }
+  .d1 .domain-title { color: var(--d1-text); }
+  .d1 .ns-pill { background: var(--d1-tag); color: var(--d1-text); }
+
+  .d2 .card-header { background: var(--d2-bg); border-color: var(--d2-border); }
+  .d2 .domain-title { color: var(--d2-text); }
+  .d2 .ns-pill { background: var(--d2-tag); color: var(--d2-text); }
+
+  .d3 .card-header { background: var(--d3-bg); border-color: var(--d3-border); }
+  .d3 .domain-title { color: var(--d3-text); }
+  .d3 .ns-pill { background: var(--d3-tag); color: var(--d3-text); }
+
+  .d4 .card-header { background: var(--d4-bg); border-color: var(--d4-border); }
+  .d4 .domain-title { color: var(--d4-text); }
+  .d4 .ns-pill { background: var(--d4-tag); color: var(--d4-text); }
+
+  .d5 .card-header { background: var(--d5-bg); border-color: var(--d5-border); }
+  .d5 .domain-title { color: var(--d5-text); }
+  .d5 .ns-pill { background: var(--d5-tag); color: var(--d5-text); }
+
+  /* Modal */
+  .modal-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.25);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(2px);
+  }
+
+  .modal-backdrop.open { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border-radius: 16px;
+    border: 1px solid var(--border-strong);
+    padding: 24px;
+    width: 380px;
+    max-width: 95vw;
+    box-shadow: 0 20px 60px rgba(0,0,0,.12);
+  }
+
+  .modal h3 {
+    font-size: 15px;
+    font-weight: 500;
+    margin-bottom: 16px;
+    color: var(--text-primary);
+  }
+
+  .modal label {
+    display: block;
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--text-tertiary);
+    margin-bottom: 5px;
+    margin-top: 14px;
+  }
+
+  .modal label:first-of-type { margin-top: 0; }
+
+  .modal input, .modal textarea {
+    width: 100%;
+    font-size: 13px;
+    padding: 8px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: 'DM Sans', sans-serif;
+    outline: none;
+    transition: border-color .15s;
+  }
+
+  .modal input:focus, .modal textarea:focus {
+    border-color: rgba(0,0,0,.3);
+  }
+
+  .modal textarea { resize: vertical; min-height: 64px; line-height: 1.5; }
+
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 20px;
+  }
+
+  .btn-cancel {
+    font-size: 13px;
+    padding: 7px 16px;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    background: transparent;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .btn-save {
+    font-size: 13px;
+    padding: 7px 16px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: var(--text-primary);
+    color: #fff;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: opacity .15s;
+  }
+
+  .btn-save:hover { opacity: .85; }
+
+  .btn-delete {
+    font-size: 13px;
+    padding: 7px 12px;
+    border: 1px solid #f0c0b8;
+    border-radius: 8px;
+    background: transparent;
+    color: #c0392b;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    margin-right: auto;
+  }
+
+  .btn-cancel:hover { background: var(--bg); }
+
+  @media (max-width: 800px) {
+    .grid { grid-template-columns: 1fr 1fr; }
+    body { padding: 32px 16px 64px; }
+  }
+
+  @media (max-width: 520px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div class="eyebrow">One-pager</div>
+  <h1>Servicing Engineering</h1>
+  <p class="sub">Hover any card to edit — click capabilities or metrics to update</p>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<!-- Cap modal -->
+<div class="modal-backdrop" id="cap-backdrop">
+  <div class="modal">
+    <h3 id="cap-modal-title">Edit capability</h3>
+    <label>Capability name</label>
+    <input type="text" id="cm-name" />
+    <label>North star impact</label>
+    <input type="text" id="cm-ns" placeholder="e.g. +15% throughput, -20% MTTR" />
+    <label>Notes</label>
+    <textarea id="cm-detail" placeholder="Owner, status, context…"></textarea>
+    <div class="modal-actions">
+      <button class="btn-delete" onclick="delCap()">Delete</button>
+      <button class="btn-cancel" onclick="closeCapModal()">Cancel</button>
+      <button class="btn-save" onclick="saveCap()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Domain modal -->
+<div class="modal-backdrop" id="dom-backdrop">
+  <div class="modal">
+    <h3>Edit domain</h3>
+    <label>Domain name</label>
+    <input type="text" id="dm-name" />
+    <label>Primary north star metric</label>
+    <input type="text" id="dm-ns1" placeholder="e.g. MDBF, fleet uptime %" />
+    <label>Secondary metric</label>
+    <input type="text" id="dm-ns2" placeholder="Supporting metric (optional)" />
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeDomainModal()">Cancel</button>
+      <button class="btn-save" onclick="saveDomain()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const data = [
+  {
+    title: "Operational Excellence",
+    ns1: "Refurbishment cycle time",
+    ns2: "SBD rate",
+    caps: [
+      { name: "SBD", ns: "Drives refurb cycle time & buffer sizing", detail: "" },
+      { name: "Refurbishment throughput", ns: "Units/week vs target", detail: "" },
+      { name: "Service buffer", ns: "Buffer days coverage", detail: "" },
+      { name: "Deployment support", ns: "On-time deployment rate", detail: "" }
+    ]
+  },
+  {
+    title: "Reliability Engineering",
+    ns1: "MDBF",
+    ns2: "First-time fix rate",
+    caps: [
+      { name: "Diagnostics", ns: "Reduces MTTR & repeat failures", detail: "" },
+      { name: "MDBF", ns: "Mean distance between failures", detail: "" },
+      { name: "Preventive maintenance", ns: "Failure rate reduction %", detail: "" },
+      { name: "Long-term fixes", ns: "Recurrence rate of known faults", detail: "" }
+    ]
+  },
+  {
+    title: "Financial Efficiency",
+    ns1: "Cost per refurb unit",
+    ns2: "Spare parts cost",
+    caps: [
+      { name: "Spare parts reduction", ns: "Parts cost as % of refurb cost", detail: "" },
+      { name: "Subassemblies", ns: "Swap time & unit cost vs repair", detail: "" },
+      { name: "Asset utilisation", ns: "Active fleet % at any time", detail: "" },
+      { name: "Refurbishment efficiency", ns: "Labour hours per refurb", detail: "" }
+    ]
+  },
+  {
+    title: "Tooling & Data",
+    ns1: "Reporting coverage %",
+    ns2: "Dashboard adoption",
+    caps: [
+      { name: "Jira", ns: "Ticket-to-resolution cycle time", detail: "" },
+      { name: "KPI dashboards", ns: "% KPIs with live data feeds", detail: "" },
+      { name: "Tech panel", ns: "Field data capture rate", detail: "" },
+      { name: "Reporting flows", ns: "Report delivery vs SLA", detail: "" }
+    ]
+  },
+  {
+    title: "Strategic Scaling",
+    ns1: "Fleet uptime / availability",
+    ns2: "Scaling milestone hit rate",
+    caps: [
+      { name: "US servicing model", ns: "Model defined & validated", detail: "" },
+      { name: "Waterfall / hub-spoke", ns: "Network efficiency score", detail: "" },
+      { name: "EU / US scaling", ns: "Capacity vs deployment demand", detail: "" },
+      { name: "Grocery servicing readiness", ns: "Readiness milestone achieved", detail: "" }
+    ]
+  },
+  {
+    title: "Cross-Functional Integration",
+    ns1: "Feedback loop velocity",
+    ns2: "Ops alignment score",
+    caps: [
+      { name: "Ops alignment", ns: "Joint OKR coverage %", detail: "" },
+      { name: "Product feedback loops", ns: "Obs-to-change logged (days)", detail: "" },
+      { name: "Supply chain coordination", ns: "Parts availability vs demand", detail: "" },
+      { name: "Field engineering feedback", ns: "Insights actioned per quarter", detail: "" }
+    ]
+  }
+];
+
+let editDi = null, editCi = null, editDomDi = null;
+
+function render() {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  data.forEach((d, di) => {
+    const card = document.createElement('div');
+    card.className = `card d${di}`;
+    card.innerHTML = `
+      <div class="card-header">
+        <div class="card-header-top">
+          <div class="domain-title">${d.title}</div>
+          <button class="edit-domain-btn" onclick="openDomainModal(${di})" title="Edit domain">✎</button>
+        </div>
+        <div class="ns-block">
+          <div class="ns-row">
+            <span class="ns-label">NS1</span>
+            <span class="ns-pill" onclick="openDomainModal(${di})">${d.ns1 || '—'}</span>
+          </div>
+          ${d.ns2 ? `<div class="ns-row"><span class="ns-label">NS2</span><span class="ns-pill" onclick="openDomainModal(${di})">${d.ns2}</span></div>` : ''}
+        </div>
+      </div>
+      <div class="card-body">
+        ${d.caps.map((c, ci) => `
+          <div class="cap-item" onclick="openCapModal(${di},${ci})">
+            <div class="cap-top">
+              <span class="cap-name">${c.name}</span>
+              <button class="cap-edit-btn" onclick="event.stopPropagation();openCapModal(${di},${ci})">edit</button>
+            </div>
+            ${c.ns ? `<div class="cap-impact">${c.ns}</div>` : ''}
+            ${c.detail ? `<div class="cap-note">${c.detail}</div>` : ''}
+          </div>`).join('')}
+        <button class="add-cap-btn" onclick="addCap(${di})">+ add capability</button>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function openCapModal(di, ci) {
+  editDi = di; editCi = ci;
+  const c = data[di].caps[ci];
+  document.getElementById('cap-modal-title').textContent = 'Edit — ' + c.name;
+  document.getElementById('cm-name').value = c.name;
+  document.getElementById('cm-ns').value = c.ns || '';
+  document.getElementById('cm-detail').value = c.detail || '';
+  document.getElementById('cap-backdrop').classList.add('open');
+  setTimeout(() => document.getElementById('cm-name').focus(), 50);
+}
+
+function closeCapModal() { document.getElementById('cap-backdrop').classList.remove('open'); }
+
+function saveCap() {
+  const c = data[editDi].caps[editCi];
+  c.name = document.getElementById('cm-name').value.trim() || c.name;
+  c.ns = document.getElementById('cm-ns').value.trim();
+  c.detail = document.getElementById('cm-detail').value.trim();
+  closeCapModal(); render();
+}
+
+function delCap() {
+  data[editDi].caps.splice(editCi, 1);
+  closeCapModal(); render();
+}
+
+function addCap(di) {
+  data[di].caps.push({ name: "New capability", ns: "", detail: "" });
+  render();
+  openCapModal(di, data[di].caps.length - 1);
+}
+
+function openDomainModal(di) {
+  editDomDi = di;
+  document.getElementById('dm-name').value = data[di].title;
+  document.getElementById('dm-ns1').value = data[di].ns1 || '';
+  document.getElementById('dm-ns2').value = data[di].ns2 || '';
+  document.getElementById('dom-backdrop').classList.add('open');
+  setTimeout(() => document.getElementById('dm-name').focus(), 50);
+}
+
+function closeDomainModal() { document.getElementById('dom-backdrop').classList.remove('open'); }
+
+function saveDomain() {
+  const d = data[editDomDi];
+  d.title = document.getElementById('dm-name').value.trim() || d.title;
+  d.ns1 = document.getElementById('dm-ns1').value.trim();
+  d.ns2 = document.getElementById('dm-ns2').value.trim();
+  closeDomainModal(); render();
+}
+
+document.getElementById('cap-backdrop').addEventListener('click', e => { if (e.target === e.currentTarget) closeCapModal(); });
+document.getElementById('dom-backdrop').addEventListener('click', e => { if (e.target === e.currentTarget) closeDomainModal(); });
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeCapModal(); closeDomainModal(); }
+});
+
+render();
+</script>
+</body>
+</html>
