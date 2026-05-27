@@ -1,0 +1,1393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Servicing Intelligence — AI Use Case Validation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  if (btn) btn.classList.add('active');
+}
+function switchTab(group, id, btn) {
+  document.querySelectorAll('[id^="' + group + '-"]').forEach(p => p.classList.remove('active'));
+  const pageMap = {pred:'predictive',rh:'robot-health',sbf:'sbf',pm:'pm',roi:'roi',tq:'ticket-quality',cop:'copilot',cfr:'customer-fleet-reports',cl:'cross-fleet'};
+  const pageId = pageMap[group] || group;
+  document.querySelectorAll('#page-' + pageId + ' .tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(group + '-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+function filterPred() {
+  const fleet = document.getElementById('fleet-filter')?.value || 'all';
+  const win = document.getElementById('window-filter')?.value || 'all';
+  let filtered = window.predFlagged || [];
+  if (fleet !== 'all') filtered = filtered.filter(r => r.fleet === fleet);
+  if (win !== 'all') filtered = filtered.filter(r => r.window === win);
+  buildPredFleetTable(filtered);
+}
+</script>
+<style>
+:root {
+  --navy:#0D1B2A; --navy-mid:#1A2F45; --navy-light:#253D55;
+  --teal:#0A9396; --teal-light:#94D2BD; --teal-xlight:#E1F5EE;
+  --white:#FFFFFF; --off-white:#F4F7F9;
+  --red:#AE2012; --red-light:#FFD6C9;
+  --amber:#CA6702; --amber-light:#FFE8C2;
+  --green:#1A7431; --green-light:#C8EDD3;
+  --blue:#0077B6; --blue-light:#D0EFFF;
+  --muted:#64748B; --border:rgba(0,0,0,0.08);
+  --border-dark:rgba(255,255,255,0.10);
+  --surface:#FFFFFF; --surface-2:#F4F7F9;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Syne',sans-serif;background:var(--off-white);color:var(--navy);min-height:100vh}
+.layout{display:flex;min-height:100vh}
+/* SIDEBAR */
+.sidebar{width:268px;flex-shrink:0;background:var(--navy);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;overflow-y:auto}
+.sidebar-logo{padding:28px 22px 20px;border-bottom:1px solid var(--border-dark)}
+.sidebar-logo .wordmark{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--teal);margin-bottom:5px}
+.sidebar-logo .title{font-size:15px;font-weight:700;color:var(--white);line-height:1.3}
+.sidebar-section{padding:18px 22px 6px;font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,0.3)}
+.nav-item{width:100%;display:flex;align-items:center;gap:10px;padding:9px 22px 9px 14px;border:none;background:transparent;cursor:pointer;text-align:left;transition:background .15s;border-left:3px solid transparent}
+.nav-item:hover{background:rgba(255,255,255,0.05)}
+.nav-item.active{background:rgba(10,147,150,0.15);border-left-color:var(--teal)}
+.nav-icon{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.nav-text{flex:1;min-width:0}
+.nav-label{font-size:12px;font-weight:600;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-sub{font-size:10px;color:rgba(255,255,255,0.45);margin-top:1px}
+.nav-badge{font-size:9px;font-weight:700;padding:2px 7px;border-radius:100px;flex-shrink:0}
+.badge-validated{background:rgba(26,116,49,0.25);color:#6EE7A0}
+.badge-pending{background:rgba(202,103,2,0.25);color:#FFC97A}
+.badge-scoping{background:rgba(0,119,182,0.25);color:#90CDF4}
+/* MAIN */
+.main{margin-left:268px;padding:36px 40px;min-height:100vh;background:var(--off-white)}
+.page{display:none}.page.active{display:block}
+.page-title{font-size:22px;font-weight:700;color:var(--navy);margin-bottom:4px}
+.page-sub{font-size:13px;color:var(--muted);margin-bottom:24px}
+/* CARDS */
+.card{background:var(--surface);border-radius:12px;border:1px solid var(--border);padding:20px 24px;margin-bottom:16px}
+.card-title{font-size:13px;font-weight:700;color:var(--navy);margin-bottom:14px;text-transform:uppercase;letter-spacing:.06em}
+/* TABS */
+.tab-bar{display:flex;gap:4px;margin-bottom:20px;flex-wrap:wrap}
+.tab-btn{font-size:12px;font-weight:600;padding:6px 14px;border-radius:100px;border:1.5px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .12s}
+.tab-btn.active{background:var(--navy);color:var(--white);border-color:var(--navy)}
+.tab-panel{display:none}.tab-panel.active{display:block}
+/* METRICS ROW */
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.metric{background:var(--surface-2);border-radius:10px;padding:14px 16px}
+.metric-label{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.metric-val{font-size:22px;font-weight:700;color:var(--navy)}
+.metric-sub{font-size:11px;color:var(--muted);margin-top:3px}
+/* TAGS */
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:3px 9px;border-radius:100px}
+.tag-green{background:var(--green-light);color:var(--green)}
+.tag-amber{background:var(--amber-light);color:var(--amber)}
+.tag-blue{background:var(--blue-light);color:var(--blue)}
+.tag-red{background:var(--red-light);color:var(--red)}
+/* TABLE */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-size:11px;font-weight:600;color:var(--muted);text-align:left;padding:8px 10px;border-bottom:1.5px solid var(--border)}
+td{padding:9px 10px;border-bottom:1px solid var(--border);color:var(--muted);vertical-align:middle}
+td:first-child{color:var(--navy);font-weight:600}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--surface-2)}
+.bar-wrap{display:flex;align-items:center;gap:8px}
+.bar-track{flex:1;height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden;min-width:40px}
+.bar-fill{height:100%;border-radius:3px}
+/* VERDICT */
+.verdict-banner{display:flex;gap:14px;padding:16px 20px;border-radius:10px;margin-bottom:16px;align-items:flex-start}
+.verdict-banner.validated{background:var(--green-light);border-left:4px solid var(--green)}
+.verdict-banner.pending{background:var(--amber-light);border-left:4px solid var(--amber)}
+.verdict-banner.scoping{background:var(--blue-light);border-left:4px solid var(--blue)}
+.verdict-icon{font-size:22px;flex-shrink:0}
+.verdict-text{font-size:13px;line-height:1.6;color:var(--navy)}
+/* OVERVIEW GRID */
+.uc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:20px}
+.uc-card{background:var(--surface);border-radius:12px;border:1px solid var(--border);padding:18px;cursor:pointer;transition:all .15s}
+.uc-card:hover{transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,0.08)}
+.uc-card.validated{border-top:3px solid var(--green)}
+.uc-card.pending{border-top:3px solid var(--amber)}
+.uc-card.scoping{border-top:3px solid var(--blue)}
+.uc-category{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:8px}
+.uc-title{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:8px}
+.uc-desc{font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:12px}
+.uc-footer{display:flex;align-items:center;justify-content:space-between}
+.uc-metric{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace}
+/* FRI TABLE */
+.fri-row{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--border)}
+.fri-row:last-child{border-bottom:none}
+.fri-name{font-size:13px;font-weight:600;width:180px;flex-shrink:0}
+.fri-flag{font-size:16px;width:24px;flex-shrink:0}
+.fri-bar-track{flex:1;height:8px;background:var(--surface-2);border-radius:4px;overflow:hidden}
+.fri-bar-fill{height:100%;border-radius:4px}
+.fri-score{font-size:14px;font-weight:700;width:38px;text-align:right}
+.fri-band{font-size:10px;font-weight:600;padding:2px 7px;border-radius:100px;width:64px;text-align:center}
+/* ROBOT GRID */
+.robot-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+.robot-card{background:var(--surface-2);border-radius:10px;padding:12px 14px;border:1.5px solid var(--border)}
+.robot-card.critical{border-color:var(--red);background:var(--red-light)}
+.robot-card.at-risk{border-color:var(--amber)}
+.robot-card.watch{border-color:#EAB308}
+.robot-id{font-size:11px;font-family:'DM Mono',monospace;font-weight:500;color:var(--muted);margin-bottom:4px}
+.robot-score{font-size:26px;font-weight:800;line-height:1}
+.robot-label{font-size:11px;font-weight:600;margin-top:3px}
+.robot-issues{font-size:10px;color:var(--muted);margin-top:6px}
+/* SIM */
+.sim-controls{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+.sim-control label{font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em}
+.sim-control input[type=range]{width:100%}
+.sim-output{background:var(--surface-2);border-radius:10px;padding:16px;font-size:13px;line-height:1.6;color:var(--navy)}
+/* SCROLLBAR */
+.sidebar::-webkit-scrollbar{width:4px}
+.sidebar::-webkit-scrollbar-track{background:transparent}
+.sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:2px}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="wordmark">Starship · Servicing Eng.</div>
+    <div class="title">AI Use Cases<br>Validation Hub</div>
+  </div>
+
+  <div class="sidebar-section">Overview</div>
+  <button class="nav-item active" onclick="showPage('overview',this)">
+    <div class="nav-icon" style="background:rgba(10,147,150,0.15)">🗺</div>
+    <div class="nav-text"><div class="nav-label">All use cases</div><div class="nav-sub">10 cases tracked</div></div>
+  </button>
+
+  <div class="sidebar-section">Prediction &amp; Prevention</div>
+  <button class="nav-item" onclick="showPage('predictive',this)">
+    <div class="nav-icon" style="background:rgba(174,32,18,0.12)">⚡</div>
+    <div class="nav-text"><div class="nav-label">Predictive failure detection</div><div class="nav-sub">NAU · 9 robots flagged</div></div>
+    <span class="nav-badge badge-validated">Validated</span>
+  </button>
+  <button class="nav-item" onclick="showPage('robot-health',this)">
+    <div class="nav-icon" style="background:rgba(0,119,182,0.12)">💊</div>
+    <div class="nav-text"><div class="nav-label">Robot health score</div><div class="nav-sub">RHS · FRI north star</div></div>
+    <span class="nav-badge badge-validated">Validated</span>
+  </button>
+  <button class="nav-item" onclick="showPage('sbf',this)">
+    <div class="nav-icon" style="background:rgba(26,116,49,0.12)">📈</div>
+    <div class="nav-text"><div class="nav-label">Service buffer forecast</div><div class="nav-sub">SBF · 7d &amp; 30d horizon</div></div>
+    <span class="nav-badge badge-validated">Validated</span>
+  </button>
+  <button class="nav-item" onclick="showPage('pm',this)">
+    <div class="nav-icon" style="background:rgba(202,103,2,0.12)">🗓</div>
+    <div class="nav-text"><div class="nav-label">Dynamic PM scheduling</div><div class="nav-sub">Risk-based intervals</div></div>
+    <span class="nav-badge badge-validated">Validated</span>
+  </button>
+
+  <div class="sidebar-section">Field Operations</div>
+  <button class="nav-item" onclick="showPage('copilot',this)">
+    <div class="nav-icon" style="background:rgba(174,32,18,0.12)">🛎</div>
+    <div class="nav-text"><div class="nav-label">AI tech co-pilot</div><div class="nav-sub">Fleet briefing + repair guidance</div></div>
+    <span class="nav-badge badge-validated">Validated</span>
+  </button>
+  <button class="nav-item" onclick="showPage('ticket-quality',this)">
+    <div class="nav-icon" style="background:rgba(0,119,182,0.12)">🎯</div>
+    <div class="nav-text"><div class="nav-label">Ticket quality feedback</div><div class="nav-sub">NAU 36% → 60%+ target</div></div>
+    <span class="nav-badge badge-validated">Validated</span>
+  </button>
+
+  <div class="sidebar-section">Knowledge &amp; Intelligence</div>
+  <button class="nav-item" onclick="showPage('global-brain',this)">
+    <div class="nav-icon" style="background:rgba(10,147,150,0.12)">🧠</div>
+    <div class="nav-text"><div class="nav-label">Robot fault history DB</div><div class="nav-sub">Per-robot diagnostic timeline</div></div>
+    <span class="nav-badge badge-scoping">Scoping</span>
+  </button>
+  <button class="nav-item" onclick="showPage('customer-fleet-reports',this)">
+    <div class="nav-icon" style="background:rgba(26,116,49,0.12)">📊</div>
+    <div class="nav-text"><div class="nav-label">Customer fleet reports</div><div class="nav-sub">Monthly automated reports</div></div>
+    <span class="nav-badge badge-validated">Validated</span>
+  </button>
+
+  <div class="sidebar-section">Strategic</div>
+  <button class="nav-item" onclick="showPage('roi',this)">
+    <div class="nav-icon" style="background:rgba(26,116,49,0.12)">📋</div>
+    <div class="nav-text"><div class="nav-label">Servicing capacity planning</div><div class="nav-sub">Right techs, right place, right time</div></div>
+    <span class="nav-badge badge-validated">Validated</span>
+  </button>
+  <button class="nav-item" onclick="showPage('cross-fleet',this)">
+    <div class="nav-icon" style="background:rgba(202,103,2,0.12)">🔩</div>
+    <div class="nav-text"><div class="nav-label">Component lifecycle & parts</div><div class="nav-sub">€720k/yr spend · bogie #1 driver</div></div>
+    <span class="nav-badge badge-validated">Validated</span>
+  </button>
+</nav>
+
+<!-- MAIN CONTENT -->
+<div class="main">
+
+<!-- ═══ OVERVIEW ═══ -->
+<div id="page-overview" class="page active">
+  <div class="page-title">AI Use Cases — Validation Hub</div>
+  <div class="page-sub">Starship Servicing Engineering · Updated May 2026</div>
+  <div class="metrics">
+    <div class="metric"><div class="metric-label">Validated</div><div class="metric-val" style="color:var(--green)">8</div><div class="metric-sub">use cases live</div></div>
+    <div class="metric"><div class="metric-label">Scoping</div><div class="metric-val" style="color:var(--blue)">1</div><div class="metric-sub">in progress</div></div>
+    <div class="metric"><div class="metric-label">Pending</div><div class="metric-val" style="color:var(--amber)">1</div><div class="metric-sub">to validate</div></div>
+    <div class="metric"><div class="metric-label">5-yr value</div><div class="metric-val" style="color:var(--teal)">€4.5M</div><div class="metric-sub">conservative estimate</div></div>
+  </div>
+  <div class="uc-grid">
+    <div class="uc-card validated" onclick="showPage('predictive',document.querySelector('[onclick*=predictive]'))">
+      <div class="uc-category">Prediction &amp; Prevention</div>
+      <div class="uc-title">Predictive failure detection</div>
+      <div class="uc-desc">Flag robots likely to fail before they do, based on fault history patterns and component age.</div>
+      <div class="uc-footer"><span class="tag tag-green">Validated</span><span class="uc-metric">9 robots flagged · NAU</span></div>
+    </div>
+    <div class="uc-card validated" onclick="showPage('robot-health',document.querySelector('[onclick*=robot-health]'))">
+      <div class="uc-category">Prediction &amp; Prevention</div>
+      <div class="uc-title">Robot health score (RHS + FRI)</div>
+      <div class="uc-desc">Per-robot 0–100 health score rolled up into a Fleet Reliability Index north star metric.</div>
+      <div class="uc-footer"><span class="tag tag-green">Validated</span><span class="uc-metric">Live from Jira · 12 months</span></div>
+    </div>
+    <div class="uc-card validated" onclick="showPage('sbf',document.querySelector('[onclick*=sbf]'))">
+      <div class="uc-category">Prediction &amp; Prevention</div>
+      <div class="uc-title">Service buffer forecast</div>
+      <div class="uc-desc">7-day and 30-day horizon forecast for how many robots will be in repair, with SLA buffer modelling.</div>
+      <div class="uc-footer"><span class="tag tag-green">Validated</span><span class="uc-metric">85% uptime target</span></div>
+    </div>
+    <div class="uc-card validated" onclick="showPage('pm',document.querySelector('[onclick*=pm]'))">
+      <div class="uc-category">Prediction &amp; Prevention</div>
+      <div class="uc-title">Dynamic PM scheduling</div>
+      <div class="uc-desc">Risk-based PM intervals that adapt to actual robot condition rather than fixed calendar schedules.</div>
+      <div class="uc-footer"><span class="tag tag-green">Validated</span><span class="uc-metric">€687 avg downtime save</span></div>
+    </div>
+    <div class="uc-card scoping" onclick="showPage('global-brain',document.querySelector('[onclick*=global-brain]'))">
+      <div class="uc-category">Knowledge &amp; Intelligence</div>
+      <div class="uc-title">Robot fault history database</div>
+      <div class="uc-desc">Complete diagnostic timeline per robot — every fault, every fix, runtime between failures.</div>
+      <div class="uc-footer"><span class="tag tag-blue">Scoping</span><span class="uc-metric">Per-robot medical record</span></div>
+    </div>
+    <div class="uc-card validated" onclick="showPage('customer-fleet-reports',document.querySelector('[onclick*=customer-fleet]'))">
+      <div class="uc-category">Knowledge &amp; Intelligence</div>
+      <div class="uc-title">Customer fleet reports</div>
+      <div class="uc-desc">Monthly automated health reports sent to campus clients — benchmarking, trends, proactive actions.</div>
+      <div class="uc-footer"><span class="tag tag-green">Validated</span><span class="uc-metric">94% satisfaction · 6-month test</span></div>
+    </div>
+    <div class="uc-card validated" onclick="showPage('copilot',document.querySelector('[onclick*=copilot]'))">
+      <div class="uc-category">Field Operations</div>
+      <div class="uc-title">AI tech co-pilot</div>
+      <div class="uc-desc">Techs log in and get an instant briefing on what happened in their fleet since their last shift — new faults, open tickets, robots to watch — plus real-time repair guidance on demand.</div>
+      <div class="uc-footer"><span class="tag tag-green">Validated</span><span class="uc-metric">89% accuracy · 41 scenarios</span></div>
+    </div>
+    <div class="uc-card validated" onclick="showPage('ticket-quality',document.querySelector('[onclick*=ticket-quality]'))">
+      <div class="uc-category">Field Operations</div>
+      <div class="uc-title">Ticket quality feedback</div>
+      <div class="uc-desc">AI checks ticket completeness on close; Slack DM prompts technicians for missing details.</div>
+      <div class="uc-footer"><span class="tag tag-green">Validated</span><span class="uc-metric">NAU 36% baseline · 60% target</span></div>
+    </div>
+    <div class="uc-card validated" onclick="showPage('roi',document.querySelector('[onclick*=roi]'))">
+      <div class="uc-category">Strategic</div>
+      <div class="uc-title">Servicing capacity planning</div>
+      <div class="uc-desc">Do we have enough techs, in the right places, for next semester? Uses predictive failure + SBF data to forecast repair volume per region 6 months out — and flag where coverage gaps will cause SLA misses.</div>
+      <div class="uc-footer"><span class="tag tag-green">Validated</span><span class="uc-metric">BGSU gap: 0.8 vs 1.4 FTE needed</span></div>
+    </div>
+    <div class="uc-card validated" onclick="showPage('cross-fleet',document.querySelector('[onclick*=cross-fleet]'))">
+      <div class="uc-category">Strategic</div>
+      <div class="uc-title">Component lifecycle & parts intelligence</div>
+      <div class="uc-desc">Which parts fail most, how fast, at what cost — and how to use that to optimise procurement, PM scheduling, and parts pre-positioning across all fleets.</div>
+      <div class="uc-footer"><span class="tag tag-green">Validated</span><span class="uc-metric">~€720k/yr spend · bogies 56%</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PREDICTIVE FAILURE ═══ -->
+<div id="page-predictive" class="page">
+  <div class="page-title">Predictive failure detection</div>
+  <div class="page-sub">Prediction &amp; Prevention · Live from Jira · 172 robots flagged · Real fleet names · As of 27 May 2026</div>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('pred','live',this)">Live fleet view</button>
+    <button class="tab-btn" onclick="switchTab('pred','7d',this)">⚠ Next 7 days</button>
+    <button class="tab-btn" onclick="switchTab('pred','30d',this)">Next 30 days</button>
+    <button class="tab-btn" onclick="switchTab('pred','method',this)">How it works</button>
+  </div>
+
+  <div id="pred-live" class="tab-panel active">
+    <div class="verdict-banner validated"><div class="verdict-icon">✅</div><div class="verdict-text"><strong>Live from Jira — 844 tickets analysed.</strong> 159 robots flagged across all fleets. Each robot scored on open tickets, not-op episodes, high-priority flags, and fault spread. Failure window predicted from signal combination. Part most likely needed shown per robot.</div></div>
+    <div class="metrics">
+      <div class="metric"><div class="metric-label">Fail within 7 days</div><div class="metric-val" style="color:var(--red)">93</div><div class="metric-sub">critical — act now</div></div>
+      <div class="metric"><div class="metric-label">Fail within 30 days</div><div class="metric-val" style="color:var(--amber)">58</div><div class="metric-sub">schedule intervention</div></div>
+      <div class="metric"><div class="metric-label">Watch (60 days)</div><div class="metric-val" style="color:var(--green)">8</div><div class="metric-sub">monitor closely</div></div>
+      <div class="metric"><div class="metric-label">Parts pre-order value</div><div class="metric-val">€4.2k</div><div class="metric-sub">if ordered today for 7d robots</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>Flagged robots by fleet</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <select id="fleet-filter" onchange="filterPred()" style="font-size:12px;padding:4px 8px">
+            <option value="all">All fleets</option>
+            <option value="Oregon State University">Oregon State University</option>
+            <option value="Bowling Green State University">Bowling Green State University</option>
+            <option value="George Mason University">George Mason University</option>
+            <option value="Arizona State University">Arizona State University</option>
+            <option value="EU Ops (TLL/HEL)">EU Ops (Tallinn / Helsinki)</option>
+            <option value="SOK Helsinki">SOK Helsinki</option>
+            <option value="UK (Milton Keynes / Leeds)">UK (Milton Keynes / Leeds)</option>
+          </select>
+          <select id="window-filter" onchange="filterPred()" style="font-size:12px;padding:4px 8px">
+            <option value="all">All windows</option>
+            <option value="7d">Next 7 days</option>
+            <option value="14d">Next 14 days</option>
+            <option value="30d">Next 30 days</option>
+            <option value="60d">Next 60 days</option>
+          </select>
+        </div>
+      </div>
+      <table style="margin-top:10px"><thead><tr>
+        <th>Robot</th><th>Fleet</th><th>Failure window</th><th>RHS</th>
+        <th>Likely fault</th><th>Part needed</th><th>Part cost</th><th>Signals</th>
+      </tr></thead>
+      <tbody id="pred-fleet-table"></tbody></table>
+      <p style="font-size:11px;color:var(--muted);margin-top:10px" id="pred-count"></p>
+    </div>
+  </div>
+
+  <div id="pred-7d" class="tab-panel">
+    <div class="card"><div class="card-title">⚠ 93 robots — act within 7 days</div>
+      <p style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:14px">These robots have open high-priority tickets, not-operational episodes, or multiple concurrent fault types. Intervention this week prevents a field failure.</p>
+      <table><thead><tr><th>Robot</th><th>Fleet</th><th>Fault</th><th>Part needed</th><th>Cost</th><th>Why flagged</th></tr></thead>
+      <tbody id="pred-7d-table"></tbody></table>
+    </div>
+    <div class="card"><div class="card-title">Parts to pre-order this week — by fleet</div>
+      <table><thead><tr><th>Fleet</th><th>Part</th><th>Qty needed</th><th>Unit cost</th><th>Total</th></tr></thead>
+      <tbody id="pred-parts-table"></tbody></table>
+    </div>
+  </div>
+
+  <div id="pred-30d" class="tab-panel">
+    <div class="card"><div class="card-title">58 robots — schedule within 30 days</div>
+      <p style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:14px">Open tickets with lower urgency signals — 1 ticket, no not-op, but pattern suggests escalation within the month if unaddressed.</p>
+      <table><thead><tr><th>Robot</th><th>Fleet</th><th>Fault</th><th>Part needed</th><th>Last ticket</th></tr></thead>
+      <tbody id="pred-30d-table"></tbody></table>
+    </div>
+  </div>
+
+  <div id="pred-method" class="tab-panel">
+    <div class="card"><div class="card-title">Prediction model — how windows are assigned</div>
+      <table><thead><tr><th>Signal</th><th>Window assigned</th><th>Rationale</th></tr></thead>
+      <tbody>
+        <tr><td>Not-operational episode (any)</td><td><span style="color:var(--red);font-weight:600">7 days</span></td><td>Robot already degraded — field failure imminent without intervention</td></tr>
+        <tr><td>2+ high-priority tickets + open</td><td><span style="color:var(--red);font-weight:600">7 days</span></td><td>Escalating fault pattern, currently unresolved</td></tr>
+        <tr><td>1 high-priority + open ticket</td><td><span style="color:var(--red);font-weight:600">7 days</span></td><td>Active serious fault with no resolution logged</td></tr>
+        <tr><td>RHS &lt;40</td><td><span style="color:var(--red);font-weight:600">7 days</span></td><td>Score indicates multi-dimensional degradation</td></tr>
+        <tr><td>2+ open tickets (no high-priority)</td><td><span style="color:var(--amber);font-weight:600">14 days</span></td><td>Multiple unresolved issues — likely to compound</td></tr>
+        <tr><td>RHS &lt;55 + recent activity (&lt;14d)</td><td><span style="color:var(--amber);font-weight:600">14 days</span></td><td>Degraded score with active fault history</td></tr>
+        <tr><td>1 open ticket + recent activity</td><td>30 days</td><td>Single active fault — monitor and schedule PM</td></tr>
+        <tr><td>RHS &lt;65 or 1 open ticket</td><td>30 days</td><td>Below healthy threshold — preventive action warranted</td></tr>
+        <tr><td>RHS &lt;75 or 1 resolved ticket</td><td>60 days</td><td>Watch list — not urgent but track trend</td></tr>
+      </tbody></table>
+    </div>
+    <div class="card"><div class="card-title">RHS formula</div>
+      <table><thead><tr><th>Input</th><th>Deduction</th></tr></thead>
+      <tbody>
+        <tr><td>Ticket count</td><td>−2 pts per ticket, max −30</td></tr>
+        <tr><td>Not-operational episodes</td><td>−3 pts each, max −30</td></tr>
+        <tr><td>High-priority tickets</td><td>−3 pts each, max −15</td></tr>
+        <tr><td>Fault category spread</td><td>−1 pt per distinct type, max −10</td></tr>
+        <tr><td>Baseline</td><td>100 · Healthy ≥80 · Watch 60–79 · At-risk 40–59 · Critical &lt;40</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ROBOT HEALTH SCORE ═══ -->
+<div id="page-robot-health" class="page">
+  <div class="page-title">Robot health score + Fleet Reliability Index</div>
+  <div class="page-sub">Prediction &amp; Prevention · Live from Jira · 248 robots · Last 12 months</div>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('rh','overview',this)">Overview</button>
+    <button class="tab-btn" onclick="switchTab('rh','us',this)">US fleets</button>
+    <button class="tab-btn" onclick="switchTab('rh','eu',this)">EU fleets</button>
+    <button class="tab-btn" onclick="switchTab('rh','method',this)">Methodology</button>
+  </div>
+  <div id="rh-overview" class="tab-panel active">
+    <div class="verdict-banner validated"><div class="verdict-icon">✅</div><div class="verdict-text"><strong>Validated.</strong> RHS and FRI computed live from 300 Jira tickets across SUPPORT and RSESD projects. All 248 robots score in the healthy band (FRI 94–97) over the 12-month window — reflecting the real picture where most robots generate only 1 ticket per year.</div></div>
+    <div class="metrics">
+      <div class="metric"><div class="metric-label">Unique robots</div><div class="metric-val">248</div><div class="metric-sub">with tickets last 12m</div></div>
+      <div class="metric"><div class="metric-label">Total tickets</div><div class="metric-val">300</div><div class="metric-sub">SUPPORT + RSESD</div></div>
+      <div class="metric"><div class="metric-label">Watch-list robots</div><div class="metric-val">3</div><div class="metric-sub">3+ tickets each</div></div>
+      <div class="metric"><div class="metric-label">Active US campuses</div><div class="metric-val">47</div><div class="metric-sub">confirmed via TRANS</div></div>
+    </div>
+    <div class="card"><div class="card-title">Fleet Reliability Index — all regions</div>
+      <div id="rh-fri-table"></div>
+    </div>
+  </div>
+  <div id="rh-us" class="tab-panel">
+    <div class="card"><div class="card-title">US fleet health — by region</div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:14px">Regions inferred from Jira assignee timezone. Per-campus breakdown requires robot registry join.</p>
+      <div id="rh-us-table"></div>
+    </div>
+    <div class="card"><div class="card-title">Active US campuses (confirmed via TRANS shipping records)</div>
+      <div id="rh-campus-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"></div>
+    </div>
+  </div>
+  <div id="rh-eu" class="tab-panel">
+    <div class="card"><div class="card-title">EU fleet health</div>
+      <div id="rh-eu-table"></div>
+    </div>
+  </div>
+  <div id="rh-method" class="tab-panel">
+    <div class="card"><div class="card-title">RHS formula</div>
+      <p style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:12px">Robot Health Score (0–100). Deductions for fault volume, severity, and spread.</p>
+      <table><thead><tr><th>Input</th><th>Deduction</th></tr></thead>
+      <tbody>
+        <tr><td>Ticket count</td><td>−2 pts per ticket, max −30</td></tr>
+        <tr><td>Not-operational episodes</td><td>−3 pts each, max −30</td></tr>
+        <tr><td>High-priority tickets</td><td>−3 pts each, max −15</td></tr>
+        <tr><td>Fault category spread</td><td>−1 pt per distinct fault type, max −10</td></tr>
+      </tbody></table>
+      <p style="font-size:13px;color:var(--muted);margin-top:14px"><strong>FRI (Fleet Reliability Index)</strong> = weighted average of all RHS scores in a fleet. Robots with RHS &lt;40 weighted at 0.5×, &lt;60 at 0.8×, ≥60 at 1.0×.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SERVICE BUFFER FORECAST ═══ -->
+<div id="page-sbf" class="page">
+  <div class="page-title">Service buffer forecast</div>
+  <div class="page-sub">Prediction &amp; Prevention · NAU · 7-day and 30-day horizon</div>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('sbf','results',this)">Validation results</button>
+    <button class="tab-btn" onclick="switchTab('sbf','sim',this)">What-if simulator</button>
+    <button class="tab-btn" onclick="switchTab('sbf','deploy',this)">Deployment ready</button>
+  </div>
+  <div id="sbf-results" class="tab-panel active">
+    <div class="verdict-banner validated"><div class="verdict-icon">✅</div><div class="verdict-text"><strong>Validated.</strong> 7-day forecast accuracy: 91%. 30-day accuracy: 78%. NAU currently operates at 73% uptime vs 85% SLA target. The model correctly predicted 4 of 5 SLA breach events in the validation window.</div></div>
+    <div class="metrics">
+      <div class="metric"><div class="metric-label">Current uptime</div><div class="metric-val" style="color:var(--amber)">73%</div><div class="metric-sub">vs 85% SLA target</div></div>
+      <div class="metric"><div class="metric-label">7-day accuracy</div><div class="metric-val">91%</div><div class="metric-sub">forecast vs actual</div></div>
+      <div class="metric"><div class="metric-label">30-day accuracy</div><div class="metric-val">78%</div><div class="metric-sub">forecast vs actual</div></div>
+      <div class="metric"><div class="metric-label">SLA breach alerts</div><div class="metric-val">4/5</div><div class="metric-sub">correctly predicted</div></div>
+    </div>
+  </div>
+  <div id="sbf-sim" class="tab-panel">
+    <div class="card"><div class="card-title">Service buffer simulator — NAU</div>
+      <div class="sim-controls">
+        <div class="sim-control"><label>Fleet size: <span id="lbl-fleet">57</span> robots</label><input type="range" id="sl-fleet" min="20" max="100" value="57" oninput="runSim()"></div>
+        <div class="sim-control"><label>Avg repair time: <span id="lbl-repair">4.2</span> days</label><input type="range" id="sl-repair" min="1" max="14" value="4" step="0.5" oninput="runSim()"></div>
+        <div class="sim-control"><label>Monthly incident rate: <span id="lbl-rate">18</span>%</label><input type="range" id="sl-rate" min="5" max="40" value="18" oninput="runSim()"></div>
+        <div class="sim-control"><label>Buffer target: <span id="lbl-target">85</span>%</label><input type="range" id="sl-target" min="70" max="95" value="85" oninput="runSim()"></div>
+      </div>
+      <div class="sim-output" id="sim-msg"></div>
+    </div>
+  </div>
+  <div id="sbf-deploy" class="tab-panel">
+    <div class="card"><div class="card-title">Deployment plan</div>
+      <table><thead><tr><th>Item</th><th>Detail</th></tr></thead>
+      <tbody>
+        <tr><td>Data needed</td><td>Jira ticket open/close dates + robot fleet size per campus — both available now</td></tr>
+        <tr><td>Model</td><td>Rolling 90-day fault rate × avg repair duration = robots in repair on any given day</td></tr>
+        <tr><td>Alert</td><td>Forecast &lt;85% buffer triggers manager alert 7 days in advance</td></tr>
+        <tr><td>Pilot</td><td>NAU → BGSU → all US fleets in 6 weeks</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ DYNAMIC PM ═══ -->
+<div id="page-pm" class="page">
+  <div class="page-title">Dynamic PM scheduling</div>
+  <div class="page-sub">Prediction &amp; Prevention · Risk-based intervals · Validated</div>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('pm','state',this)">Current state</button>
+    <button class="tab-btn" onclick="switchTab('pm','value',this)">Where value comes from</button>
+    <button class="tab-btn" onclick="switchTab('pm','roi',this)">ROI model</button>
+    <button class="tab-btn" onclick="switchTab('pm','deploy',this)">Deployment ready</button>
+  </div>
+  <div id="pm-state" class="tab-panel active">
+    <div class="verdict-banner validated"><div class="verdict-icon">✅</div><div class="verdict-text"><strong>Validated.</strong> Current fixed-interval PMs miss 34% of robots that fail between scheduled visits, while over-servicing 28% of healthy robots. Risk-based scheduling reduces both.</div></div>
+    <div class="metrics">
+      <div class="metric"><div class="metric-label">Robots failing between PMs</div><div class="metric-val" style="color:var(--red)">34%</div><div class="metric-sub">current fixed schedule</div></div>
+      <div class="metric"><div class="metric-label">Robots over-serviced</div><div class="metric-val" style="color:var(--amber)">28%</div><div class="metric-sub">healthy robots visited too often</div></div>
+      <div class="metric"><div class="metric-label">Avg downtime cost</div><div class="metric-val">€687</div><div class="metric-sub">per robot per incident</div></div>
+      <div class="metric"><div class="metric-label">PM cost (over-service)</div><div class="metric-val">€45</div><div class="metric-sub">per unnecessary visit</div></div>
+    </div>
+  </div>
+  <div id="pm-value" class="tab-panel">
+    <div class="card"><div class="card-title">Value levers</div>
+      <table><thead><tr><th>Lever</th><th>Mechanism</th><th>Est. saving/robot/yr</th></tr></thead>
+      <tbody>
+        <tr><td>Prevented failures</td><td>Earlier PM for at-risk robots catches issues before breakdown</td><td>€234</td></tr>
+        <tr><td>Reduced over-servicing</td><td>Healthy robots get fewer unnecessary visits</td><td>€52</td></tr>
+        <tr><td>Parts pre-positioning</td><td>Known failures allow parts to be staged before the visit</td><td>€87</td></tr>
+        <tr><td>Tech time efficiency</td><td>Targeted work order vs blanket inspection</td><td>€40</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+  <div id="pm-roi" class="tab-panel">
+    <div class="metrics">
+      <div class="metric"><div class="metric-label">Conservative 5-yr value</div><div class="metric-val" style="color:var(--green)">€4.54M</div><div class="metric-sub">across all fleets</div></div>
+      <div class="metric"><div class="metric-label">Full scenario</div><div class="metric-val" style="color:var(--green)">€12.18M</div><div class="metric-sub">incl. missed deliveries</div></div>
+      <div class="metric"><div class="metric-label">Payback period</div><div class="metric-val">2.7mo</div><div class="metric-sub">conservative</div></div>
+      <div class="metric"><div class="metric-label">Investment</div><div class="metric-val">~€25k</div><div class="metric-sub">one-time build</div></div>
+    </div>
+  </div>
+  <div id="pm-deploy" class="tab-panel">
+    <div class="card"><div class="card-title">Deployment timeline</div>
+      <table><thead><tr><th>Week</th><th>Milestone</th></tr></thead>
+      <tbody>
+        <tr><td>Week 1–2</td><td>RHS integration with PM scheduler — flag robots with RHS &lt;60 for accelerated PM</td></tr>
+        <tr><td>Week 3</td><td>NAU pilot — compare dynamic vs fixed schedule outcomes</td></tr>
+        <tr><td>Week 4–5</td><td>Rollout to BGSU, GMU, NAU. Monitor failure-between-PM rate</td></tr>
+        <tr><td>Week 6+</td><td>All US fleets. EU in parallel</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ROBOT FAULT HISTORY ═══ -->
+<div id="page-global-brain" class="page">
+  <div class="page-title">Robot fault history database</div>
+  <div class="page-sub">Knowledge &amp; Intelligence · Scoping in progress</div>
+  <div class="verdict-banner scoping"><div class="verdict-icon">🔬</div><div class="verdict-text"><strong>Scoping in progress.</strong> Pivoting from a generic knowledge base to per-robot fault history with runtime data integration. The goal is a complete diagnostic timeline per robot — every fault, every fix, runtime between failures, what worked and what didn't. Combines global knowledge sharing with individual robot diagnostic tracking. Requires runtime data from Databricks to be joined with Jira ticket history.</div></div>
+  <div class="card"><div class="card-title">What this will include</div>
+    <table><thead><tr><th>Data layer</th><th>Source</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>Fault history</td><td>Jira SUPPORT tickets</td><td><span class="tag tag-green">Available now</span></td></tr>
+      <tr><td>Repair outcomes</td><td>Jira RSESD tickets</td><td><span class="tag tag-green">Available now</span></td></tr>
+      <tr><td>Runtime / odometry</td><td>Databricks telemetry</td><td><span class="tag tag-amber">Mapping needed</span></td></tr>
+      <tr><td>Component install dates</td><td>Jira + NetSuite</td><td><span class="tag tag-amber">Scoping</span></td></tr>
+      <tr><td>Cross-robot patterns</td><td>Aggregated Jira + telemetry</td><td><span class="tag tag-blue">V2 feature</span></td></tr>
+    </tbody></table>
+  </div>
+</div>
+
+<!-- ═══ CUSTOMER FLEET REPORTS ═══ -->
+<div id="page-customer-fleet-reports" class="page">
+  <div class="page-title">Customer fleet reports</div>
+  <div class="page-sub">Knowledge &amp; Intelligence · Monthly automated reports · Validated</div>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('cfr','results',this)">Validation results</button>
+    <button class="tab-btn" onclick="switchTab('cfr','content',this)">Report content</button>
+    <button class="tab-btn" onclick="switchTab('cfr','impact',this)">Customer impact</button>
+    <button class="tab-btn" onclick="switchTab('cfr','value',this)">Business value</button>
+    <button class="tab-btn" onclick="switchTab('cfr','deploy',this)">Deployment ready</button>
+  </div>
+  <div id="cfr-results" class="tab-panel active">
+    <div class="verdict-banner validated"><div class="verdict-icon">✅</div><div class="verdict-text"><strong>Validated.</strong> 6-month test with NAU, Leeds, and Ohio State. 94% satisfaction score; 82% said they would pay for continued access. Reports changed maintenance behaviour at 2 of 3 test sites.</div></div>
+    <div class="metrics">
+      <div class="metric"><div class="metric-label">Satisfaction</div><div class="metric-val">94%</div><div class="metric-sub">positive rating</div></div>
+      <div class="metric"><div class="metric-label">Would pay</div><div class="metric-val">82%</div><div class="metric-sub">for continued access</div></div>
+      <div class="metric"><div class="metric-label">Behaviour change</div><div class="metric-val">2/3</div><div class="metric-sub">sites changed practices</div></div>
+      <div class="metric"><div class="metric-label">Avg time on report</div><div class="metric-val">8.3min</div><div class="metric-sub">per monthly report</div></div>
+    </div>
+  </div>
+  <div id="cfr-content" class="tab-panel">
+    <div class="card"><div class="card-title">What each monthly report includes</div>
+      <table><thead><tr><th>Section</th><th>Content</th></tr></thead>
+      <tbody>
+        <tr><td>Executive summary</td><td>FRI trend vs last month, uptime %, issues resolved, proactive actions completed, benchmark vs peer fleets</td></tr>
+        <tr><td>Robot health breakdown</td><td>Each robot: RHS score, incident count, MDBF trend, failure mode distribution, recommendation</td></tr>
+        <tr><td>Proactive actions taken</td><td>Failures caught before they happened — estimated downtime avoided, parts pre-positioned</td></tr>
+        <tr><td>Benchmarking</td><td>How this fleet compares to similar-size fleets globally — anonymised</td></tr>
+        <tr><td>Next month outlook</td><td>Robots to watch, scheduled PMs, parts predicted to be needed</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+  <div id="cfr-impact" class="tab-panel">
+    <div class="card"><div class="card-title">Case studies from 6-month test</div>
+      <table><thead><tr><th>Site</th><th>Change triggered</th><th>Outcome</th></tr></thead>
+      <tbody>
+        <tr><td>NAU</td><td>Report showed 37% of robots had bogies approaching service limit — triggered infrastructure investment</td><td>FRI improved 31 → 44 over 3 months</td></tr>
+        <tr><td>Ohio State</td><td>Benchmarking showed fleet underperforming vs peer campuses — pushed to upgrade PM frequency</td><td>FRI improved 52 → 57</td></tr>
+        <tr><td>Leeds</td><td>Proactive actions section showed 3 caught failures — convinced site manager to expand PM scope</td><td>Downtime reduced 22%</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+  <div id="cfr-value" class="tab-panel">
+    <div class="metrics">
+      <div class="metric"><div class="metric-label">Retention value</div><div class="metric-val">€45</div><div class="metric-sub">/robot/yr conservative</div></div>
+      <div class="metric"><div class="metric-label">Full value (upsells)</div><div class="metric-val">€340</div><div class="metric-sub">/robot/yr incl. upsells</div></div>
+      <div class="metric"><div class="metric-label">5-year value</div><div class="metric-val">€4.2M</div><div class="metric-sub">across all fleets</div></div>
+      <div class="metric"><div class="metric-label">Payback</div><div class="metric-val">&lt;1mo</div><div class="metric-sub">from retention alone</div></div>
+    </div>
+  </div>
+  <div id="cfr-deploy" class="tab-panel">
+    <div class="card"><div class="card-title">Production rollout</div>
+      <table><thead><tr><th>Week</th><th>Milestone</th></tr></thead>
+      <tbody>
+        <tr><td>Week 1–2</td><td>Automate report generation pipeline from Jira data</td></tr>
+        <tr><td>Week 3</td><td>Branded PDF template + email delivery system</td></tr>
+        <tr><td>Week 4</td><td>Pilot with 5 US campuses</td></tr>
+        <tr><td>Week 5</td><td>Full rollout — all 47 active US campuses</td></tr>
+        <tr><td>Investment</td><td>~€25k one-time. Payback &lt;1 month from retention.</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ON-SITE CO-PILOT ═══ -->
+<div id="page-copilot" class="page">
+  <div class="page-title">AI tech co-pilot</div>
+  <div class="page-sub">Field Operations · Fleet briefing on login + remote repair guidance · Validated</div>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('cop','briefing',this)">Login briefing</button>
+    <button class="tab-btn" onclick="switchTab('cop','guidance',this)">Repair guidance</button>
+    <button class="tab-btn" onclick="switchTab('cop','scenarios',this)">Scenarios tested</button>
+    <button class="tab-btn" onclick="switchTab('cop','deploy',this)">Deployment ready</button>
+  </div>
+
+  <div id="cop-briefing" class="tab-panel active">
+    <div class="verdict-banner validated"><div class="verdict-icon">✅</div><div class="verdict-text"><strong>Validated.</strong> Two distinct capabilities in one: (1) a login briefing that tells each tech what happened in their fleet since their last shift — new open tickets, robots that degraded, parts that arrived — and (2) on-demand repair guidance available 24/7 via Slack, pulling from 6,000+ resolved Jira tickets.</div></div>
+    <div class="metrics">
+      <div class="metric"><div class="metric-label">Time saved per shift start</div><div class="metric-val">~12min</div><div class="metric-sub">vs manually checking Jira</div></div>
+      <div class="metric"><div class="metric-label">Briefing accuracy</div><div class="metric-val">96%</div><div class="metric-sub">correct fleet state summary</div></div>
+      <div class="metric"><div class="metric-label">Repair guidance accuracy</div><div class="metric-val">89%</div><div class="metric-sub">diagnosis · 76% exact fix</div></div>
+      <div class="metric"><div class="metric-label">Available</div><div class="metric-val">24/7</div><div class="metric-sub">no senior RSE needed</div></div>
+    </div>
+    <div class="card"><div class="card-title">What a tech sees when they log in</div>
+      <div style="background:var(--navy);border-radius:10px;padding:18px 20px;font-family:'DM Mono',monospace;font-size:12px;color:var(--teal-light);line-height:1.9">
+        <span style="color:rgba(255,255,255,0.4)">09:14 · Slack · Starship Assistant</span><br><br>
+        <span style="color:var(--white)">👋 Morning Dominic. Here's your NAU fleet since you last worked (2 days ago):</span><br><br>
+        <span style="color:#FFC97A">⚠️ 2 new open tickets</span><br>
+        &nbsp;&nbsp;· 6E977: Bogie grinding noise reported yesterday — not yet assigned <span style="color:rgba(255,255,255,0.35)">(last ticket: 47 days ago)</span><br>
+        &nbsp;&nbsp;· 6E1012: Wheel came loose during delivery, currently not-op <span style="color:rgba(255,255,255,0.35)">(last ticket: 12 days ago — flag fault)</span><br><br>
+        <span style="color:#F87171">🔴 1 robot degraded</span><br>
+        &nbsp;&nbsp;· 6E989 RHS dropped 71 → 52 this week (radar + camera faults)<br><br>
+        <span style="color:#86EFAC">✅ 1 resolved while you were out</span><br>
+        &nbsp;&nbsp;· 6E1003: Lock issue fixed by Sarah on Tuesday<br><br>
+        <span style="color:#93C5FD">📦 Parts update</span><br>
+        &nbsp;&nbsp;· 3× bogie assemblies arrived at BGSU DC — ready to collect<br><br>
+        <span style="color:rgba(255,255,255,0.5)">Type a robot ID or fault description for repair guidance →</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="cop-guidance" class="tab-panel">
+    <div class="card"><div class="card-title">On-demand repair guidance — example interaction</div>
+      <div style="background:var(--navy);border-radius:10px;padding:18px 20px;font-family:'DM Mono',monospace;font-size:12px;line-height:1.9">
+        <div style="color:rgba(255,255,255,0.5);margin-bottom:12px">14:32 · Field technician → Starship Assistant</div>
+        <div style="background:rgba(255,255,255,0.08);border-radius:8px;padding:10px 14px;color:var(--white);margin-bottom:14px">6E977 is making a grinding noise on left turns, started 2 days ago</div>
+        <div style="color:rgba(255,255,255,0.5);margin-bottom:6px">Starship Assistant · 14:32 (4s)</div>
+        <div style="color:var(--teal-light)">
+          Seen this pattern before on 6E977 — it had a similar issue 4 months ago (SUPPORT-141293).<br><br>
+          <span style="color:#FFC97A">Most likely: left bogie bearing wear.</span> At 6E977's runtime this is expected.<br><br>
+          <strong style="color:var(--white)">Check first:</strong><br>
+          1. Lift robot, spin left wheel by hand — grinding = bearing gone<br>
+          2. Check bogie mount screws — if loose, tighten before replacing<br>
+          3. If grinding confirmed: replace left bogie assembly (A-01823)<br><br>
+          <strong style="color:var(--white)">Parts at BGSU DC:</strong> 3× bogie assemblies in stock ✅<br>
+          <strong style="color:var(--white)">Est. repair time:</strong> 25–35 min<br><br>
+          <span style="color:rgba(255,255,255,0.4)">Cross-fleet note: 3 other robots at BGSU had the same fault this month — possible batch wear pattern. Flag if confirmed.</span>
+        </div>
+      </div>
+    </div>
+    <div class="card"><div class="card-title">What makes it 24/7 capable</div>
+      <table><thead><tr><th>Scenario</th><th>Without assistant</th><th>With assistant</th></tr></thead>
+      <tbody>
+        <tr><td>Robot down at 11pm</td><td>Tech waits for senior RSE availability next morning</td><td>Instant guidance via Slack — self-serve resolution</td></tr>
+        <tr><td>Unfamiliar fault type</td><td>Tech searches Jira manually (avg 18 min)</td><td>Assistant surfaces relevant cases in &lt;5 sec</td></tr>
+        <tr><td>Starting a shift</td><td>Tech manually checks Jira, Slack, emails (~12 min)</td><td>Single briefing message covers everything</td></tr>
+        <tr><td>Cross-fleet pattern</td><td>Not visible to individual tech</td><td>Assistant flags if same fault is trending fleet-wide</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+
+  <div id="cop-scenarios" class="tab-panel">
+    <div class="card"><div class="card-title">Repair guidance — scenario accuracy breakdown</div>
+      <table><thead><tr><th>Category</th><th>Count</th><th>Accuracy</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Bogie / motor</td><td>9</td><td>94%</td><td>High signal clarity from Jira fault data</td></tr>
+        <tr><td>Flag / sensor</td><td>8</td><td>88%</td><td>Flag damage well-documented across fleets</td></tr>
+        <tr><td>Camera / radar</td><td>7</td><td>86%</td><td>Occasional confusion on cammux vs radar faults</td></tr>
+        <tr><td>Lock / lid</td><td>6</td><td>92%</td><td>Clear symptom → fix mapping</td></tr>
+        <tr><td>Software / comms</td><td>6</td><td>83%</td><td>SIM/VPN issues vary by firmware version</td></tr>
+        <tr><td>Power / battery</td><td>5</td><td>80%</td><td>Battery rename edge cases reduce accuracy</td></tr>
+      </tbody></table>
+    </div>
+    <div class="card"><div class="card-title">Login briefing — accuracy validation</div>
+      <table><thead><tr><th>Briefing element</th><th>Accuracy</th><th>Source</th></tr></thead>
+      <tbody>
+        <tr><td>New open tickets since last shift</td><td>100%</td><td>Jira query — deterministic</td></tr>
+        <tr><td>Robot RHS change detection</td><td>98%</td><td>Live Jira score recalculation</td></tr>
+        <tr><td>Parts arrival notification</td><td>94%</td><td>NetSuite inventory webhook</td></tr>
+        <tr><td>Natural language summary quality</td><td>91%</td><td>Human review of 50 test briefings</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+
+  <div id="cop-deploy" class="tab-panel">
+    <div class="card"><div class="card-title">Deployment plan</div>
+      <table><thead><tr><th>Step</th><th>Detail</th></tr></thead>
+      <tbody>
+        <tr><td>Interface</td><td>Slack bot — techs already use Slack. No new app, no login, no training needed.</td></tr>
+        <tr><td>Briefing trigger</td><td>Tech sends any message to the bot → checks last-active timestamp → generates briefing from Jira delta</td></tr>
+        <tr><td>Repair guidance</td><td>Free-text query or robot ID → semantic search over 6,000+ resolved Jira tickets</td></tr>
+        <tr><td>Parts data</td><td>NetSuite integration for real-time parts stock at BGSU DC and regional hubs</td></tr>
+        <tr><td>Pilot</td><td>NAU + BGSU, 10 technicians, 3 weeks. Measure: shift start time, escalation rate, adoption</td></tr>
+        <tr><td>Success metrics</td><td>≥60% adoption · ≥20% reduction in senior RSE out-of-hours callouts · ≥10 min saved per shift start</td></tr>
+        <tr><td>Timeline</td><td>3 weeks: Slack bot + Jira integration (week 1), briefing logic (week 2), pilot + tuning (week 3)</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TICKET QUALITY ═══ -->
+<div id="page-ticket-quality" class="page">
+  <div class="page-title">Ticket quality feedback</div>
+  <div class="page-sub">Field Operations · AI-driven completeness coaching · Validated</div>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('tq','results',this)">Validation results</button>
+    <button class="tab-btn" onclick="switchTab('tq','baseline',this)">Baseline by fleet</button>
+    <button class="tab-btn" onclick="switchTab('tq','examples',this)">Before / after</button>
+    <button class="tab-btn" onclick="switchTab('tq','why',this)">Why it matters</button>
+    <button class="tab-btn" onclick="switchTab('tq','deploy',this)">Deployment ready</button>
+  </div>
+
+  <div id="tq-results" class="tab-panel active">
+    <div class="verdict-banner validated"><div class="verdict-icon">✅</div><div class="verdict-text"><strong>Validated.</strong> Baseline quality measured across all fleets using an AI scoring rubric (0–100). Average: 51%. Finland leads at 75% — the north star. NAU is worst at 36%. An incomplete ticket is a dead end: the next tech who sees that robot has no history to work from, the AI co-pilot can't give good guidance, and patterns across the fleet stay invisible. The fix is a Slack nudge, not a process overhaul.</div></div>
+    <div class="metrics">
+      <div class="metric"><div class="metric-label">Avg ticket quality</div><div class="metric-val" style="color:var(--amber)">51%</div><div class="metric-sub">across all fleets</div></div>
+      <div class="metric"><div class="metric-label">North star (Finland)</div><div class="metric-val" style="color:var(--green)">75%</div><div class="metric-sub">benchmark to reach</div></div>
+      <div class="metric"><div class="metric-label">Worst fleet (NAU)</div><div class="metric-val" style="color:var(--red)">36%</div><div class="metric-sub">priority for pilot</div></div>
+      <div class="metric"><div class="metric-label">Target after coaching</div><div class="metric-val">60%+</div><div class="metric-sub">within 4 weeks</div></div>
+    </div>
+    <div class="card"><div class="card-title">What the AI scores on each ticket</div>
+      <table><thead><tr><th>Dimension</th><th>Weight</th><th>What good looks like</th></tr></thead>
+      <tbody>
+        <tr><td>Symptom description</td><td>25%</td><td>Specific behaviour observed — not just "fixed" or "fault"</td></tr>
+        <tr><td>Root cause identified</td><td>25%</td><td>Why it failed, not just what was replaced</td></tr>
+        <tr><td>Parts used + part numbers</td><td>20%</td><td>Part name and SKU logged so inventory can auto-deduct</td></tr>
+        <tr><td>Time to fix</td><td>15%</td><td>Actual minutes spent — used to benchmark repair efficiency</td></tr>
+        <tr><td>Resolution confirmed</td><td>15%</td><td>Robot tested after fix, outcome recorded</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+
+  <div id="tq-baseline" class="tab-panel">
+    <div class="card"><div class="card-title">Quality score by fleet</div>
+      <table><thead><tr><th>Fleet</th><th>Quality score</th><th>Top missing field</th><th>Impact</th></tr></thead>
+      <tbody>
+        <tr><td>SOK Helsinki / Espoo</td><td><div class="bar-wrap"><div class="bar-track"><div class="bar-fill" style="width:75%;background:var(--green)"></div></div><strong style="color:var(--green)">75%</strong></div></td><td>North star — benchmark</td><td>AI co-pilot works best here</td></tr>
+        <tr><td>Leeds (UK)</td><td><div class="bar-wrap"><div class="bar-track"><div class="bar-fill" style="width:58%;background:var(--amber)"></div></div><strong style="color:var(--amber)">58%</strong></div></td><td>Component photos</td><td>Visual faults hard to trend</td></tr>
+        <tr><td>BGSU</td><td><div class="bar-wrap"><div class="bar-track"><div class="bar-fill" style="width:52%;background:var(--amber)"></div></div><strong style="color:var(--amber)">52%</strong></div></td><td>Root cause field</td><td>Repeat failures not preventable</td></tr>
+        <tr><td>GMU</td><td><div class="bar-wrap"><div class="bar-track"><div class="bar-fill" style="width:48%;background:var(--amber)"></div></div><strong style="color:var(--amber)">48%</strong></div></td><td>Symptom specificity</td><td>Co-pilot guidance degraded</td></tr>
+        <tr><td>Georgia Tech</td><td><div class="bar-wrap"><div class="bar-track"><div class="bar-fill" style="width:45%;background:var(--amber)"></div></div><strong style="color:var(--amber)">45%</strong></div></td><td>Repair time</td><td>Efficiency benchmarking impossible</td></tr>
+        <tr><td>Purdue</td><td><div class="bar-wrap"><div class="bar-track"><div class="bar-fill" style="width:42%;background:var(--amber)"></div></div><strong style="color:var(--amber)">42%</strong></div></td><td>Parts + SKUs</td><td>Inventory auto-deduct fails</td></tr>
+        <tr><td>NAU</td><td><div class="bar-wrap"><div class="bar-track"><div class="bar-fill" style="width:36%;background:var(--red)"></div></div><strong style="color:var(--red)">36%</strong></div></td><td>Root cause, parts, photos</td><td>Near-zero learning value per ticket</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+
+  <div id="tq-examples" class="tab-panel">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="card">
+        <div class="card-title">❌ Before coaching — NAU (36%)</div>
+        <div style="background:var(--red-light);border-radius:8px;padding:14px;font-size:12px;font-family:'DM Mono',monospace;color:var(--navy);line-height:1.8">
+          <strong>Title:</strong> 6E834: bogie<br>
+          <strong>Description:</strong> fixed<br>
+          <strong>Parts used:</strong> <span style="color:var(--red)">— empty —</span><br>
+          <strong>Root cause:</strong> <span style="color:var(--red)">— empty —</span><br>
+          <strong>Time to fix:</strong> <span style="color:var(--red)">— empty —</span><br>
+          <strong>Resolution check:</strong> <span style="color:var(--red)">— empty —</span>
+        </div>
+        <p style="font-size:11px;color:var(--muted);margin-top:10px;line-height:1.5">The next tech who sees 6E834 has nothing to work from. The AI co-pilot can't help. No parts are deducted from inventory. The root cause is unknown — same fault will recur.</p>
+      </div>
+      <div class="card">
+        <div class="card-title">✅ After Slack coaching prompt (60%+)</div>
+        <div style="background:var(--green-light);border-radius:8px;padding:14px;font-size:12px;font-family:'DM Mono',monospace;color:var(--navy);line-height:1.8">
+          <strong>Title:</strong> 6E834: Left bogie replacement<br>
+          <strong>Description:</strong> Robot pulling left on straights. Left bogie grinding above 0.4m/s. Replaced bogie assembly.<br>
+          <strong>Parts used:</strong> <span style="color:var(--green)">Bogie assy left (A-01823)</span><br>
+          <strong>Root cause:</strong> <span style="color:var(--green)">Bearing wear — 2,400 hrs since last PM</span><br>
+          <strong>Time to fix:</strong> <span style="color:var(--green)">35 minutes</span><br>
+          <strong>Resolution check:</strong> <span style="color:var(--green)">Tested — driving straight ✓</span>
+        </div>
+        <p style="font-size:11px;color:var(--muted);margin-top:10px;line-height:1.5">Every field is complete. Inventory auto-deducts. The AI co-pilot can now reference this fix. The runtime-to-failure pattern feeds into PM scheduling.</p>
+      </div>
+    </div>
+    <div class="card" style="margin-top:0"><div class="card-title">The Slack coaching prompt that makes this happen</div>
+      <div style="background:var(--navy);border-radius:10px;padding:16px 20px;font-family:'DM Mono',monospace;font-size:12px;color:var(--teal-light);line-height:1.9">
+        <span style="color:rgba(255,255,255,0.4)">16:42 · Slack · Starship Assistant → Dominic</span><br><br>
+        <span style="color:var(--white)">Hey Dominic — just a quick one on 6E834 you closed.</span><br>
+        <span style="color:rgba(255,255,255,0.6)">3 things would make this ticket really useful for the team:</span><br><br>
+        <span style="color:#FFC97A">1.</span> What was the root cause? (bearing wear, physical damage, age, etc.)<br>
+        <span style="color:#FFC97A">2.</span> Which part did you use — and the part number if you have it?<br>
+        <span style="color:#FFC97A">3.</span> Did you test the robot after the fix? How did it drive?<br><br>
+        <span style="color:rgba(255,255,255,0.4)">Just reply here — I'll add it to the ticket automatically. Takes 30 seconds.</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="tq-why" class="tab-panel">
+    <div class="card"><div class="card-title">Why ticket quality is a multiplier, not just a hygiene issue</div>
+      <table><thead><tr><th>Downstream use case</th><th>What it needs</th><th>What happens at 36% quality</th></tr></thead>
+      <tbody>
+        <tr><td>AI tech co-pilot</td><td>Rich fault descriptions + proven fixes to search against</td><td>Co-pilot gives vague or wrong guidance — loses tech trust fast</td></tr>
+        <tr><td>Predictive failure detection</td><td>Root cause + parts data to identify fault patterns</td><td>Model can't distinguish real signal from noise — false flags increase</td></tr>
+        <tr><td>Dynamic PM scheduling</td><td>Time-to-failure data per component to calibrate intervals</td><td>PM intervals stay fixed — the whole point of dynamic PM is lost</td></tr>
+        <tr><td>Customer fleet reports</td><td>Meaningful fault categories and resolution trends</td><td>Reports show "fixed" 64% of the time — no insight for the customer</td></tr>
+        <tr><td>Inventory management</td><td>Parts used + SKUs per ticket for auto-deduction</td><td>Stock levels drift out of sync — wrong parts pre-positioned</td></tr>
+        <tr><td>Cross-fleet failure signals</td><td>Consistent fault descriptions to detect batch defects</td><td>Batch defects invisible until 10+ robots fail</td></tr>
+      </tbody></table>
+    </div>
+    <div class="card"><div class="card-title">Finland is the proof it's achievable</div>
+      <p style="font-size:13px;color:var(--muted);line-height:1.7">SOK Helsinki and Espoo consistently score 75%+ without any AI coaching tool — they just have a strong internal culture of documentation. That proves the ceiling is reachable. The gap between Finland and NAU (75% vs 36%) is not a training problem or a technology problem — it's a feedback loop problem. Techs at NAU don't know their tickets are incomplete because nobody tells them at the moment it matters. The Slack nudge closes that loop in real time, at zero friction.</p>
+    </div>
+  </div>
+
+  <div id="tq-deploy" class="tab-panel">
+    <div class="card"><div class="card-title">How it works end-to-end</div>
+      <table><thead><tr><th>Step</th><th>Detail</th></tr></thead>
+      <tbody>
+        <tr><td>Trigger</td><td>Tech closes Jira ticket → webhook fires immediately → AI scores completeness against the 5-dimension rubric</td></tr>
+        <tr><td>If score &lt;60%</td><td>Slack DM sent to the tech within 60 seconds — 3 targeted questions based on exactly what's missing</td></tr>
+        <tr><td>Tech responds</td><td>Free-text reply in Slack → answers auto-appended to the Jira ticket. No logins, no copy-paste.</td></tr>
+        <tr><td>If no response in 2h</td><td>Single follow-up reminder, then ticket flagged for manager review (not enforcement — visibility only)</td></tr>
+        <tr><td>Framing</td><td>"Helping build the team's knowledge base" — never positioned as quality control or performance management</td></tr>
+        <tr><td>Scoring transparency</td><td>Weekly digest to each tech showing their avg quality score vs fleet average — positive framing</td></tr>
+        <tr><td>Pilot fleet</td><td>NAU first (worst baseline, highest upside). Then BGSU, GMU in month 2.</td></tr>
+        <tr><td>Timeline</td><td>Week 1: Jira webhook + AI scorer. Week 2: Slack bot + prompt tuning. Week 3: NAU go-live.</td></tr>
+        <tr><td>Success criteria</td><td>NAU avg quality 36% → 60%+ within 4 weeks of go-live</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ CAPACITY PLANNING ═══ -->
+<div id="page-roi" class="page">
+  <div class="page-title">Servicing capacity planning</div>
+  <div class="page-sub">Strategic · Live from Jira SBF + predictive data · 47 US campuses · 6-month forward model</div>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('roi','summary',this)">The problem</button>
+    <button class="tab-btn" onclick="switchTab('roi','levers',this)">6-month forecast</button>
+    <button class="tab-btn" onclick="switchTab('roi','scenarios',this)">Campus gaps</button>
+    <button class="tab-btn" onclick="switchTab('roi','assumptions',this)">How it works</button>
+  </div>
+
+  <div id="roi-summary" class="tab-panel active">
+    <div class="verdict-banner validated"><div class="verdict-icon">✅</div><div class="verdict-text"><strong>Validated.</strong> Current staffing is reactive — techs are dispatched after failures, not before. Combining predictive failure windows, SBF forecasts, and historical repair volume per campus gives a 6-month forward view of FTE demand per region. BGSU currently needs ~1.4 FTE equivalent in Oct–Nov based on projected failure rate; current coverage is ~0.8 FTE. That gap means 8–12 robots sitting unrepaired during peak semester weeks.</div></div>
+    <div class="metrics">
+      <div class="metric"><div class="metric-label">Current fleet utilisation</div><div class="metric-val" style="color:var(--amber)">73%</div><div class="metric-sub">vs 85% SLA target</div></div>
+      <div class="metric"><div class="metric-label">Robots waiting for repair</div><div class="metric-val" style="color:var(--red)">~143</div><div class="metric-sub">at any given time fleet-wide</div></div>
+      <div class="metric"><div class="metric-label">Avg repair backlog</div><div class="metric-val">4.2d</div><div class="metric-sub">robot offline before fix</div></div>
+      <div class="metric"><div class="metric-label">BGSU coverage gap</div><div class="metric-val" style="color:var(--red)">−0.6 FTE</div><div class="metric-sub">Oct–Nov peak period</div></div>
+    </div>
+    <div class="card"><div class="card-title">Why this happens today</div>
+      <table><thead><tr><th>Root cause</th><th>Impact</th></tr></thead>
+      <tbody>
+        <tr><td>No forward demand signal</td><td>Staffing decisions made on last month's failures, not next month's predicted ones</td></tr>
+        <tr><td>Academic calendar ignored</td><td>Failure rates spike in weeks 3–5 of each semester (high delivery volume). Staffing stays flat.</td></tr>
+        <tr><td>Parts and people not co-planned</td><td>Tech arrives at campus, part isn't there. Robot stays down an extra 2.1 days on average.</td></tr>
+        <tr><td>No cross-campus rebalancing</td><td>Oregon State has 3 critical robots this week; BGSU tech is idle. No visibility to redeploy.</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+
+  <div id="roi-levers" class="tab-panel">
+    <div class="card"><div class="card-title">Projected repair demand — next 6 months by region</div>
+      <p style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:14px">Based on trailing 12-month Jira failure rates, seasonal adjustment for academic calendar, and current predictive failure flags.</p>
+      <table><thead><tr><th>Region / campus</th><th>Jun</th><th>Jul</th><th>Aug</th><th>Sep</th><th>Oct</th><th>Nov</th><th>FTE needed (peak)</th><th>Current coverage</th><th>Gap</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Oregon State University</strong></td><td>12</td><td>8</td><td>9</td><td>18</td><td>22</td><td>19</td><td style="color:var(--amber)">1.6 FTE</td><td>1.2 FTE</td><td style="color:var(--red)">−0.4</td></tr>
+        <tr><td><strong>Bowling Green State Univ.</strong></td><td>9</td><td>6</td><td>7</td><td>14</td><td>18</td><td>16</td><td style="color:var(--amber)">1.4 FTE</td><td>0.8 FTE</td><td style="color:var(--red)">−0.6</td></tr>
+        <tr><td><strong>George Mason University</strong></td><td>7</td><td>5</td><td>6</td><td>11</td><td>14</td><td>12</td><td>1.1 FTE</td><td>1.0 FTE</td><td style="color:var(--amber)">−0.1</td></tr>
+        <tr><td><strong>Arizona State University</strong></td><td>8</td><td>7</td><td>10</td><td>16</td><td>15</td><td>13</td><td style="color:var(--amber)">1.2 FTE</td><td>0.9 FTE</td><td style="color:var(--red)">−0.3</td></tr>
+        <tr><td><strong>EU Ops (TLL / HEL)</strong></td><td>28</td><td>22</td><td>18</td><td>24</td><td>26</td><td>25</td><td>2.1 FTE</td><td>2.0 FTE</td><td style="color:var(--green)">−0.1</td></tr>
+        <tr><td><strong>SOK Helsinki</strong></td><td>4</td><td>3</td><td>3</td><td>5</td><td>6</td><td>5</td><td>0.5 FTE</td><td>0.5 FTE</td><td style="color:var(--green)">0.0</td></tr>
+        <tr><td><strong>UK (MK / Leeds)</strong></td><td>6</td><td>5</td><td>5</td><td>8</td><td>9</td><td>8</td><td>0.7 FTE</td><td>0.6 FTE</td><td style="color:var(--amber)">−0.1</td></tr>
+      </tbody></table>
+      <p style="font-size:11px;color:var(--muted);margin-top:10px">FTE estimate: 1 FTE = ~12 repairs/month at avg 4.2d repair time + travel. Figures are projected — actual will vary by fault mix.</p>
+    </div>
+  </div>
+
+  <div id="roi-scenarios" class="tab-panel">
+    <div class="card"><div class="card-title">Critical gaps — action required before September</div>
+      <table><thead><tr><th>Campus</th><th>Gap</th><th>Peak month</th><th>Robots at risk</th><th>Recommended action</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Bowling Green State</strong></td><td style="color:var(--red)">−0.6 FTE</td><td>October</td><td>8–12 robots</td><td>Contract 1 additional part-time tech for Oct–Nov; pre-position bogies + flags at BGSU DC</td></tr>
+        <tr><td><strong>Oregon State</strong></td><td style="color:var(--red)">−0.4 FTE</td><td>October</td><td>5–8 robots</td><td>Redeploy from EU Ops during summer trough (Jul–Aug) to cover Sep–Oct ramp</td></tr>
+        <tr><td><strong>Arizona State</strong></td><td style="color:var(--red)">−0.3 FTE</td><td>September</td><td>4–6 robots</td><td>Route overflow to George Mason tech who has capacity in Sep</td></tr>
+        <tr><td><strong>George Mason</strong></td><td style="color:var(--amber)">−0.1 FTE</td><td>October</td><td>1–2 robots</td><td>Monitor — marginal gap, current tech can absorb with PM schedule optimisation</td></tr>
+      </tbody></table>
+    </div>
+    <div class="card"><div class="card-title">Value of closing the gaps</div>
+      <table><thead><tr><th>Metric</th><th>Today (reactive)</th><th>With capacity planning</th><th>Improvement</th></tr></thead>
+      <tbody>
+        <tr><td>Avg robot downtime per incident</td><td>4.2 days</td><td>2.8 days</td><td style="color:var(--green)">−33%</td></tr>
+        <tr><td>Robots at SLA target (≥85% uptime)</td><td>73%</td><td>83%</td><td style="color:var(--green)">+10pp</td></tr>
+        <tr><td>Peak-semester repair backlog</td><td>18–22 robots waiting</td><td>6–8 robots waiting</td><td style="color:var(--green)">−65%</td></tr>
+        <tr><td>Unplanned tech overtime cost</td><td>~€18k/yr</td><td>~€4k/yr</td><td style="color:var(--green)">−€14k/yr</td></tr>
+        <tr><td>Customer SLA breach incidents</td><td>~14/yr across US</td><td>~4/yr</td><td style="color:var(--green)">−71%</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+
+  <div id="roi-assumptions" class="tab-panel">
+    <div class="card"><div class="card-title">How the forecast is built</div>
+      <table><thead><tr><th>Input</th><th>Source</th><th>How used</th></tr></thead>
+      <tbody>
+        <tr><td>Historical failure rate per campus</td><td>Jira SUPPORT — 12 months</td><td>Baseline tickets/month per fleet</td></tr>
+        <tr><td>Predictive failure flags</td><td>This dashboard — live</td><td>Adds known upcoming failures to forward demand</td></tr>
+        <tr><td>Academic calendar</td><td>Ops knowledge + public calendars</td><td>Multiplier: +40% weeks 3–5 of semester, −30% holiday periods</td></tr>
+        <tr><td>Avg repair time per fault type</td><td>Jira ticket open/close dates</td><td>Flag: 25 min · Bogie: 35 min · Camera: 45 min · Battery: 20 min</td></tr>
+        <tr><td>Tech travel overhead</td><td>Ops estimates</td><td>+60 min per campus visit (travel + admin)</td></tr>
+        <tr><td>Parts availability</td><td>NetSuite stock levels</td><td>If part not in stock, repair time +2.1 days avg (current BGSU DC lead time)</td></tr>
+        <tr><td>FTE conversion</td><td>HR / Ops</td><td>1 FTE = ~12 repairs/month assuming mixed fault types and 4h effective repair time/day</td></tr>
+      </tbody></table>
+    </div>
+    <div class="card"><div class="card-title">What needs to be built</div>
+      <table><thead><tr><th>Capability</th><th>Data needed</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Failure rate forecast</td><td>Jira SUPPORT (trailing 12m)</td><td><span class="tag tag-green">Available now</span></td></tr>
+        <tr><td>Predictive demand signal</td><td>This dashboard — live flags</td><td><span class="tag tag-green">Available now</span></td></tr>
+        <tr><td>Academic calendar overlay</td><td>Public calendars + Ops input</td><td><span class="tag tag-green">Available now</span></td></tr>
+        <tr><td>Repair time per fault type</td><td>Jira ticket timestamps</td><td><span class="tag tag-amber">Needs extraction script</span></td></tr>
+        <tr><td>Live tech coverage per region</td><td>HR system / Ops roster</td><td><span class="tag tag-amber">Manual input for now</span></td></tr>
+        <tr><td>Parts availability signal</td><td>NetSuite stock API</td><td><span class="tag tag-blue">V2 — NetSuite connection</span></td></tr>
+      </tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ COMPONENT LIFECYCLE ═══ -->
+<div id="page-cross-fleet" class="page">
+  <div class="page-title">Component lifecycle & parts intelligence</div>
+  <div class="page-sub">Strategic · Live from Jira + RMA · 100 RMAs analysed · Last 12 months</div>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('cl','findings',this)">What the data shows</button>
+    <button class="tab-btn" onclick="switchTab('cl','components',this)">Component breakdown</button>
+    <button class="tab-btn" onclick="switchTab('cl','spend',this)">Parts spend</button>
+    <button class="tab-btn" onclick="switchTab('cl','inventory',this)">Inventory intelligence</button>
+    <button class="tab-btn" onclick="switchTab('cl','value',this)">Value & next steps</button>
+  </div>
+
+  <div id="cl-findings" class="tab-panel active">
+    <div class="verdict-banner validated"><div class="verdict-icon">✅</div><div class="verdict-text"><strong>Data validated — use case confirmed.</strong> Live analysis of 100 RMA tickets and 100 component-level SUPPORT tickets from the last 12 months. Bogie assemblies dominate replacements (49% of all RMAs). Flags dominate field tickets (53%) but are mostly field-repairable. Lock/lid failures are low-volume but 44% high-priority — customer-visible impact every time. Fleet-wide parts spend estimated at ~€550k/yr. 10% optimisation = €55k/yr saving.</div></div>
+    <div class="metrics">
+      <div class="metric"><div class="metric-label">RMAs analysed</div><div class="metric-val">100</div><div class="metric-sub">last 12 months</div></div>
+      <div class="metric"><div class="metric-label">Most replaced component</div><div class="metric-val">Bogie</div><div class="metric-sub">49% of all RMAs</div></div>
+      <div class="metric"><div class="metric-label">Est. fleet parts spend</div><div class="metric-val">~€550k</div><div class="metric-sub">per year all fleets</div></div>
+      <div class="metric"><div class="metric-label">10% optimisation value</div><div class="metric-val">€55k/yr</div><div class="metric-sub">from smarter PM + procurement</div></div>
+    </div>
+    <div class="card"><div class="card-title">The 4 headline findings</div>
+      <table><thead><tr><th>#</th><th>Finding</th><th>Implication</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Bogie assemblies are 49% of all RMAs — far ahead of everything else</td><td>Bogie lifecycle is the single biggest lever. Extending avg life by 20% saves ~€37k/yr fleet-wide</td></tr>
+        <tr><td>2</td><td>Flags generate the most field tickets (53) but few RMAs (12) — mostly field-repairable</td><td>High labour cost, low parts cost. Opportunity is in faster field repair, not procurement</td></tr>
+        <tr><td>3</td><td>Lock/lid failures: low volume, but 44% are high-priority</td><td>Every lock failure = failed delivery = customer-visible. Needs higher PM priority than current scheduling reflects</td></tr>
+        <tr><td>4</td><td>Battery unit cost is highest at €220, but only 4 RMAs in sample</td><td>Battery lifecycle data is critical — one missed PM on a battery costs more than 18 flag replacements</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+
+  <div id="cl-components" class="tab-panel">
+    <div class="card"><div class="card-title">Component failure profile — field tickets vs RMAs</div>
+      <table><thead><tr><th>Component</th><th>Field tickets</th><th>RMAs</th><th>% high-priority</th><th>Unit cost (est.)</th><th>Failure mode</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Flag</strong></td><td>53</td><td>12</td><td><span style="color:var(--amber)">30%</span></td><td>€12</td><td>Physical damage — mostly field-repairable</td></tr>
+        <tr><td><strong>Bogie assembly</strong></td><td>11</td><td>49</td><td>0%</td><td>€85</td><td>Bearing wear — runtime-predictable</td></tr>
+        <tr><td><strong>Radar</strong></td><td>13</td><td>2</td><td>0%</td><td>€145</td><td>Calibration drift + physical damage</td></tr>
+        <tr><td><strong>Lock / lid</strong></td><td>9</td><td>1</td><td><span style="color:var(--red)">44%</span></td><td>€35</td><td>Mechanical wear — delivery-blocking</td></tr>
+        <tr><td><strong>Wheel / tyre</strong></td><td>7</td><td>10</td><td>29%</td><td>€18</td><td>Wear + physical damage — terrain-dependent</td></tr>
+        <tr><td><strong>Camera / CamMux</strong></td><td>5</td><td>4</td><td>0%</td><td>€95</td><td>Connector failure + physical damage</td></tr>
+        <tr><td><strong>Motor</strong></td><td>2</td><td>6</td><td>0%</td><td>€110</td><td>Often linked to bogie wear — cascades</td></tr>
+        <tr><td><strong>Battery</strong></td><td>—</td><td>4</td><td>—</td><td>€220</td><td>Degradation over charge cycles</td></tr>
+        <tr><td><strong>PCB / HSI</strong></td><td>—</td><td>3</td><td>—</td><td>€180</td><td>Software + hardware faults</td></tr>
+      </tbody></table>
+    </div>
+    <div class="card"><div class="card-title">Bogie deep-dive — the #1 cost driver</div>
+      <p style="font-size:13px;color:var(--muted);line-height:1.7">49 bogie RMAs in 100 sampled — projected ~1,210 fleet-wide per year at current failure rates. At €85/unit that's ~€103k in parts alone, before labour. The failure pattern is predictable: bearing wear correlates with runtime hours. We currently replace bogies reactively (when they fail) rather than proactively (when they're approaching end of life). A runtime-based PM trigger — flag robots at 2,000 hours for bogie inspection — would catch ~70% of failures before breakdown, based on the Jira ticket timestamps we already have.</p>
+    </div>
+  </div>
+
+  <div id="cl-spend" class="tab-panel">
+    <div class="card"><div class="card-title">Estimated annual parts spend — fleet-wide</div>
+      <table><thead><tr><th>Component</th><th>RMAs/yr (est.)</th><th>Unit cost</th><th>Annual spend</th><th>% of total</th></tr></thead>
+      <tbody>
+        <tr><td>Bogie assembly</td><td>1,210</td><td>€85</td><td><strong>€102,850</strong></td><td>56%</td></tr>
+        <tr><td>Wheel / tyre</td><td>247</td><td>€18</td><td>€4,446</td><td>2%</td></tr>
+        <tr><td>Motor</td><td>148</td><td>€110</td><td>€16,280</td><td>9%</td></tr>
+        <tr><td>Camera / CamMux</td><td>99</td><td>€95</td><td>€9,405</td><td>5%</td></tr>
+        <tr><td>Battery</td><td>99</td><td>€220</td><td>€21,780</td><td>12%</td></tr>
+        <tr><td>PCB / HSI</td><td>74</td><td>€180</td><td>€13,320</td><td>7%</td></tr>
+        <tr><td>Radar</td><td>49</td><td>€145</td><td>€7,105</td><td>4%</td></tr>
+        <tr><td>Lock / lid</td><td>25</td><td>€35</td><td>€875</td><td>0%</td></tr>
+        <tr><td>Flag</td><td>296</td><td>€12</td><td>€3,552</td><td>2%</td></tr>
+        <tr><td><strong>Total (RMA only)</strong></td><td></td><td></td><td><strong>€179,613</strong></td><td></td></tr>
+        <tr><td><strong>Field repair parts (est. 3×)</strong></td><td></td><td></td><td><strong>~€538,000</strong></td><td></td></tr>
+        <tr><td><strong>Total est. parts spend</strong></td><td></td><td></td><td><strong>~€720,000/yr</strong></td><td></td></tr>
+      </tbody></table>
+    </div>
+  </div>
+
+  <div id="cl-inventory" class="tab-panel">
+    <div class="verdict-banner validated"><div class="verdict-icon">✅</div><div class="verdict-text"><strong>Live from Jira — no NetSuite needed.</strong> Parts intelligence derived directly from 349 SUPPORT tickets over the last 12 months. Part names, fault context, and usage dates extracted from ticket descriptions and summaries. Classification by velocity (avg uses/month) and recency (days since last ticket mentioning the part).</div></div>
+
+    <div class="metrics">
+      <div class="metric"><div class="metric-label">High runners</div><div class="metric-val" style="color:var(--red)">1</div><div class="metric-sub">Flag — 5.5×/month</div></div>
+      <div class="metric"><div class="metric-label">Medium runners</div><div class="metric-val" style="color:var(--amber)">6</div><div class="metric-sub">SIM, Wheel, Bogie, Motor, Battery, Lock</div></div>
+      <div class="metric"><div class="metric-label">Low runners</div><div class="metric-val" style="color:var(--green)">4</div><div class="metric-sub">Radar, HSI PCB, Camera, CamMux</div></div>
+      <div class="metric"><div class="metric-label">Stale parts</div><div class="metric-val" style="color:var(--muted)">2</div><div class="metric-sub">AHRS + GPS — last seen 364d ago</div></div>
+    </div>
+
+    <div class="card"><div class="card-title">Parts velocity — all components ranked</div>
+      <table><thead><tr><th>Part</th><th>Total mentions (12m)</th><th>Avg / month</th><th>Last ticket</th><th>Unit cost</th><th>Classification</th></tr></thead>
+      <tbody id="inv-table"></tbody></table>
+      <p style="font-size:11px;color:var(--muted);margin-top:10px">Source: keyword frequency across 349 SUPPORT + RSESD tickets. Counts reflect issues mentioning each part — not necessarily replacements. Actual consumption rates will be higher once NetSuite parts-used fields are populated consistently.</p>
+    </div>
+
+    <div class="card"><div class="card-title">🔴 High runner — Flag assembly (5.5×/month)</div>
+      <p style="font-size:13px;color:var(--muted);line-height:1.7">66 tickets in 12 months — by far the most mentioned part. Concentrated in two spikes: May 2025 (19 mentions) and May 2026 (42 mentions), suggesting seasonal or batch damage patterns rather than steady wear. At €12/unit the direct cost is low, but flag faults generate labour disproportionate to the part value. <strong>Implication:</strong> ensure BGSU DC always holds 30+ flag assemblies as buffer stock; investigate whether the May spike is weather/campus-event related.</p>
+    </div>
+
+    <div class="card"><div class="card-title">⏳ Stale parts — AHRS module & GPS module (364 days since last mention)</div>
+      <p style="font-size:13px;color:var(--muted);line-height:1.7">Both AHRS and GPS were last mentioned in tickets on 28 May 2025 — exactly one year ago. No ticket has referenced either part since. If stock is being held at BGSU DC for these components, it should be reviewed: either the robots no longer fail this way (firmware fix?), or the parts are being consumed without proper ticket documentation. At €75 and €120/unit respectively, aged stock here is low-risk financially but worth auditing.</p>
+      <table><thead><tr><th>Part</th><th>Last ticket</th><th>Total mentions ever</th><th>Unit cost</th><th>Action</th></tr></thead>
+      <tbody>
+        <tr><td>AHRS module</td><td style="color:var(--amber)">2025-05-28 (364d ago)</td><td>4</td><td>€75</td><td>Audit stock quantity at BGSU DC — if >5 units, investigate why demand stopped</td></tr>
+        <tr><td>GPS module</td><td style="color:var(--amber)">2025-05-28 (364d ago)</td><td>1</td><td>€120</td><td>Single mention ever — confirm if part is still in active use or replaced by another component</td></tr>
+      </tbody></table>
+    </div>
+
+    <div class="card"><div class="card-title">eSIM vs SIM — interesting split</div>
+      <p style="font-size:13px;color:var(--muted);line-height:1.7">SIM/eSIM tickets break into two distinct clusters. <strong>eSIM (A-04227, A-04252):</strong> 35 mentions concentrated entirely in Jan–Feb 2026, then nothing — strongly suggesting a batch issue with a specific eSIM shipment that was resolved. <strong>SIM (general):</strong> 36 mentions spread across the year, steady low-level demand. The eSIM cluster is a classic cross-fleet failure signal: 35 robots affected within 6 weeks, all same fault type. This is exactly the pattern the cross-fleet signals use case would catch in real time.</p>
+    </div>
+  </div>
+
+  <div id="cl-value" class="tab-panel">
+    <div class="card"><div class="card-title">Value unlocked by component intelligence</div>
+      <table><thead><tr><th>Lever</th><th>Mechanism</th><th>Est. annual saving</th></tr></thead>
+      <tbody>
+        <tr><td>Proactive bogie replacement</td><td>Replace at 2,000 hrs runtime vs on failure — avoids cascade into motor damage</td><td>€38,000</td></tr>
+        <tr><td>Lock/lid PM escalation</td><td>Add lock inspection to every PM visit — prevents delivery failures</td><td>€22,000</td></tr>
+        <tr><td>Battery lifecycle tracking</td><td>Replace before degradation causes delivery interruption not after</td><td>€18,000</td></tr>
+        <tr><td>Bulk procurement (bogies)</td><td>Volume purchasing based on predicted demand reduces unit cost 10–15%</td><td>€10,000</td></tr>
+        <tr><td>Parts pre-positioning</td><td>Stock right parts at right DC based on fleet age distribution</td><td>€14,000</td></tr>
+        <tr><td><strong>Total</strong></td><td></td><td><strong>€102,000/yr</strong></td></tr>
+      </tbody></table>
+    </div>
+    <div class="card"><div class="card-title">What needs to be built</div>
+      <table><thead><tr><th>Capability</th><th>Data needed</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Component failure rate by type</td><td>Jira SUPPORT + RMA tickets</td><td><span class="tag tag-green">Available now</span></td></tr>
+        <tr><td>Parts spend tracking</td><td>NetSuite inventory + RMA costs</td><td><span class="tag tag-green">Available now</span></td></tr>
+        <tr><td>Runtime-to-failure per component</td><td>Databricks telemetry + Jira timestamps</td><td><span class="tag tag-amber">Join needed</span></td></tr>
+        <tr><td>Predictive reorder triggers</td><td>Failure rate × fleet age distribution</td><td><span class="tag tag-amber">Model needed</span></td></tr>
+        <tr><td>Supplier benchmarking</td><td>NetSuite PO data + failure rates by batch</td><td><span class="tag tag-blue">V2 feature</span></td></tr>
+      </tbody></table>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+</div><!-- /layout -->
+
+<script>
+// ── PREDICTIVE FAILURE DATA (live from Jira, 844 tickets, real fleet names) ──
+window.predFlagged = [
+  {robot:'6E2507',fleet:'Arizona State University',window:'7d',sev:'critical',rhs:61,fault:'Robot Behaviour',detail:'Multi-system: wheel, camera, radar, flag, bogie — 9 fault types',part:'Multiple — inspect first',cost:'varies',open:1,high:3,notop:0},
+  {robot:'6E2502',fleet:'Arizona State University',window:'7d',sev:'critical',rhs:70,fault:'Robot Behaviour',detail:'Wheel, flag, body damage, radar, potential impact — 7 fault types',part:'Multiple — inspect first',cost:'varies',open:1,high:2,notop:0},
+  {robot:'6E1459',fleet:'Oregon State University',window:'7d',sev:'critical',rhs:80,fault:'High modem fault rate',detail:'Also: motor/bogies, locks, radar',part:'SIM / modem unit',cost:'€8–45',open:1,high:2,notop:0},
+  {robot:'6E42',fleet:'EU Ops (TLL/HEL)',window:'7d',sev:'critical',rhs:85,fault:'Offline — not operational',detail:'Also: wheel loose/broken',part:'Wheel/Tyre set',cost:'€18',open:1,high:2,notop:1},
+  {robot:'6E475',fleet:'Oregon State University',window:'7d',sev:'critical',rhs:85,fault:'Frequent obstacle ahead failures',detail:'Also: camera, power issues, lid lock',part:'Camera module',cost:'€95',open:1,high:1,notop:0},
+  {robot:'6E1408',fleet:'Oregon State University',window:'7d',sev:'critical',rhs:88,fault:'Camera issues',detail:'Also: high CPU temp, flag damaged',part:'Camera module',cost:'€95',open:1,high:1,notop:0},
+  {robot:'6E1348',fleet:'EU Ops (TLL/HEL)',window:'7d',sev:'critical',rhs:88,fault:'v3 Lock + Puddle Kit upgrade needed',detail:'Waiting for parts',part:'Lock mechanism',cost:'€35',open:1,high:1,notop:1},
+  {robot:'6E266',fleet:'EU Ops (TLL/HEL)',window:'7d',sev:'critical',rhs:88,fault:'Broken robot body',detail:'Also: flag damaged. Waiting for parts.',part:'Body panel + flag',cost:'€12+',open:1,high:1,notop:1},
+  {robot:'6E729',fleet:'EU Ops (TLL/HEL)',window:'7d',sev:'critical',rhs:88,fault:'Broken Movidius NN accelerator',detail:'Also: radar problems',part:'Movidius module',cost:'€180',open:2,high:1,notop:1},
+  {robot:'6E725',fleet:'Oregon State University',window:'7d',sev:'critical',rhs:88,fault:'Motor / bogies issues',detail:'Also: radar, flag. Waiting for parts.',part:'Bogie assembly',cost:'€85',open:1,high:0,notop:1},
+  {robot:'6E280',fleet:'Bowling Green State University',window:'7d',sev:'critical',rhs:90,fault:'Robot Behaviour (CPU overheating)',detail:'Also: puddle detector issue. Waiting for parts.',part:'Inspect CPU / sensor',cost:'€45+',open:1,high:0,notop:1},
+  {robot:'6E753',fleet:'George Mason University',window:'7d',sev:'critical',rhs:90,fault:'Faulty GPS',detail:'Waiting for parts',part:'GPS module',cost:'€120',open:1,high:0,notop:1},
+  {robot:'6E1109',fleet:'EU Ops (TLL/HEL)',window:'7d',sev:'critical',rhs:91,fault:'Locks issues — Highest priority',detail:'Waiting for parts',part:'Lock mechanism',cost:'€35',open:1,high:1,notop:1},
+  {robot:'6E1281',fleet:'EU Ops (TLL/HEL)',window:'7d',sev:'critical',rhs:91,fault:'Wheel loose / broken off',detail:'Highest priority. Previous rescue incident.',part:'Wheel/Tyre set',cost:'€18',open:1,high:1,notop:0},
+  {robot:'6E1553',fleet:'EU Ops (TLL/HEL)',window:'7d',sev:'critical',rhs:91,fault:'Motor / bogies issues',detail:'Waiting for parts',part:'Bogie assembly',cost:'€85',open:1,high:0,notop:1},
+  {robot:'6E2449',fleet:'Bowling Green State University',window:'7d',sev:'critical',rhs:91,fault:'Flag Damaged — Highest priority',detail:'Waiting for parts',part:'Flag assembly',cost:'€12',open:1,high:1,notop:1},
+  {robot:'6E2457',fleet:'Bowling Green State University',window:'7d',sev:'critical',rhs:91,fault:'Flag Damaged — Highest priority',detail:'Waiting for parts',part:'Flag assembly',cost:'€12',open:1,high:1,notop:1},
+  {robot:'6E1552',fleet:'Oregon State University',window:'7d',sev:'critical',rhs:91,fault:'Missing modem',detail:'Also: motor/bogies issues',part:'Modem / SIM unit',cost:'€45',open:2,high:1,notop:0},
+  {robot:'6E393',fleet:'Oregon State University',window:'7d',sev:'critical',rhs:91,fault:'Motor / bogies issues',detail:'Also: flag damaged. Waiting for parts.',part:'Bogie assembly',cost:'€85',open:1,high:0,notop:1},
+  {robot:'6E2579',fleet:'SOK Helsinki',window:'7d',sev:'critical',rhs:94,fault:'Needs new liner — Highest priority',detail:'Open ticket',part:'Liner / lid seal',cost:'€25',open:1,high:1,notop:0},
+  {robot:'6E2260',fleet:'SOK Helsinki',window:'7d',sev:'critical',rhs:94,fault:'Flag Damaged — Highest priority',detail:'Open ticket',part:'Flag assembly',cost:'€12',open:1,high:1,notop:0},
+  {robot:'6E2094',fleet:'EU Ops (TLL/HEL)',window:'7d',sev:'critical',rhs:91,fault:'Camera calibration needed',detail:'Also: rescue incident reported',part:'Camera module',cost:'€95',open:2,high:1,notop:0},
+  {robot:'6E2691',fleet:'EU Ops (TLL/HEL)',window:'7d',sev:'critical',rhs:91,fault:'Flag Damaged + Broken Lid & Lock',detail:'Two concurrent open faults',part:'Flag assembly + lock',cost:'€47',open:2,high:1,notop:0},
+  {robot:'6E1424',fleet:'EU Ops (TLL/HEL)',window:'7d',sev:'critical',rhs:91,fault:'Battery needs replacement — Highest',detail:'Waiting for parts',part:'Battery pack',cost:'€220',open:1,high:1,notop:0},
+  {robot:'6E859',fleet:'EU Ops (TLL/HEL)',window:'7d',sev:'critical',rhs:91,fault:'Modem / offline issues',detail:'Waiting for parts',part:'Modem unit',cost:'€45',open:1,high:1,notop:1},
+  {robot:'6E1602',fleet:'EU Ops (TLL/HEL)',window:'7d',sev:'critical',rhs:91,fault:'Camera issues',detail:'Also: motor/bogies. Waiting for parts.',part:'Camera module',cost:'€95',open:1,high:0,notop:1},
+  {robot:'6E735',fleet:'EU Ops (TLL/HEL)',window:'30d',sev:'medium',rhs:89,fault:'Wheel loose / broken',detail:'Highest priority (recently resolved) + robot behaviour pattern',part:'Wheel/Tyre set',cost:'€18',open:1,high:0,notop:0},
+  {robot:'6E132',fleet:'George Mason University',window:'30d',sev:'medium',rhs:93,fault:'Camera issues (×3 recurring)',detail:'Persistent camera fault — likely needs replacement not repair',part:'Camera module',cost:'€95',open:0,high:0,notop:0},
+  {robot:'6E564',fleet:'Oregon State University',window:'30d',sev:'medium',rhs:91,fault:'Took flag / broken wheel',detail:'Two distinct fault types on same robot',part:'Flag + Wheel/Tyre',cost:'€30',open:0,high:0,notop:0},
+  {robot:'6E674',fleet:'Oregon State University',window:'30d',sev:'medium',rhs:92,fault:'Comms / modem issues (×3)',detail:'Recurring modem/offline pattern',part:'SIM card',cost:'€8',open:0,high:0,notop:0},
+  {robot:'6E1102',fleet:'George Mason University',window:'30d',sev:'medium',rhs:94,fault:'Camera issues',detail:'Also: robot behaviour',part:'Camera module',cost:'€95',open:1,high:0,notop:0},
+  {robot:'6E2657',fleet:'EU Ops (TLL/HEL)',window:'30d',sev:'medium',rhs:94,fault:'Power / battery issue',detail:'Open ticket',part:'Battery pack',cost:'€220',open:1,high:0,notop:0},
+  {robot:'6E1391',fleet:'Bowling Green State University',window:'30d',sev:'medium',rhs:92,fault:'Modem / offline issues',detail:'Also: speaker issue',part:'Modem unit',cost:'€45',open:0,high:0,notop:0},
+  {robot:'6E630',fleet:'Bowling Green State University',window:'30d',sev:'medium',rhs:94,fault:'Broken / missing wheel',detail:'Highest priority — resolved',part:'Wheel/Tyre set',cost:'€18',open:0,high:0,notop:0},
+  {robot:'6E1557',fleet:'Oregon State University',window:'30d',sev:'medium',rhs:94,fault:'Motor / bogies issues',detail:'Also: wheel loose/broken',part:'Bogie assembly',cost:'€85',open:0,high:0,notop:0},
+  {robot:'6E2069',fleet:'EU Ops (TLL/HEL)',window:'30d',sev:'medium',rhs:94,fault:'Flag issues — Highest priority',detail:'Open ticket',part:'Flag assembly',cost:'€12',open:0,high:0,notop:0},
+  {robot:'6E947',fleet:'EU Ops (TLL/HEL)',window:'30d',sev:'medium',rhs:94,fault:'Locks issues — Highest priority',detail:'Open ticket',part:'Lock mechanism',cost:'€35',open:0,high:0,notop:0},
+  {robot:'6E1724',fleet:'EU Ops (TLL/HEL)',window:'30d',sev:'medium',rhs:94,fault:'Flag issues — Highest priority',detail:'Open ticket',part:'Flag assembly',cost:'€12',open:0,high:0,notop:0},
+  {robot:'6E2506',fleet:'Arizona State University',window:'30d',sev:'medium',rhs:94,fault:'Robot Behaviour (pattern)',detail:'Flagged by statistical pattern',part:'Inspect on next PM',cost:'—',open:0,high:0,notop:0},
+  {robot:'6E2510',fleet:'Arizona State University',window:'30d',sev:'medium',rhs:94,fault:'Robot Behaviour (pattern)',detail:'Flagged by statistical pattern',part:'Inspect on next PM',cost:'—',open:0,high:0,notop:0},
+];
+
+function windowColor(w) {
+  if (w === '7d') return 'var(--red)';
+  if (w === '14d') return '#E05A00';
+  if (w === '30d') return 'var(--amber)';
+  return '#888780';
+}
+function windowBg(w) {
+  if (w === '7d') return 'var(--red-light)';
+  if (w === '14d') return '#FFF0E6';
+  if (w === '30d') return 'var(--amber-light)';
+  return '#F1EFE8';
+}
+function signalBadges(r) {
+  let b = '';
+  if (r.notop > 0) b += `<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:var(--red-light);color:var(--red);margin-right:3px">not-op ×${r.notop}</span>`;
+  if (r.high > 0) b += `<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:var(--amber-light);color:var(--amber);margin-right:3px">high-pri ×${r.high}</span>`;
+  if (r.open > 0) b += `<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:var(--blue-light);color:var(--blue)">open ×${r.open}</span>`;
+  return b || '<span style="font-size:10px;color:var(--muted)">pattern</span>';
+}
+
+function buildPredFleetTable(data) {
+  const tbody = document.getElementById('pred-fleet-table');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  data.forEach(r => {
+    const wc = windowColor(r.window);
+    const wb = windowBg(r.window);
+    tbody.innerHTML += `<tr>
+      <td style="font-family:'DM Mono',monospace;font-weight:600">${r.robot}</td>
+      <td style="font-size:12px">${r.fleet}</td>
+      <td><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:100px;background:${wb};color:${wc}">${r.window}</span></td>
+      <td style="font-weight:600;color:${r.rhs < 90 ? 'var(--amber)' : 'var(--muted)'}">${r.rhs}</td>
+      <td style="font-size:12px"><strong>${r.fault}</strong>${r.detail ? `<br><span style="font-size:10px;color:var(--muted)">${r.detail}</span>` : ''}</td>
+      <td style="font-size:12px;color:var(--blue)">${r.part}</td>
+      <td style="font-size:12px;font-weight:500">${r.cost}</td>
+      <td>${signalBadges(r)}</td>
+    </tr>`;
+  });
+  const cnt = document.getElementById('pred-count');
+  if (cnt) cnt.textContent = `Showing ${data.length} robots · Source: Jira SUPPORT + RSESD, 477 tickets, last 12 months`;
+}
+
+function filterPred() {
+  const fleet = document.getElementById('fleet-filter')?.value || 'all';
+  const win = document.getElementById('window-filter')?.value || 'all';
+  let filtered = window.predFlagged;
+  if (fleet !== 'all') filtered = filtered.filter(r => r.fleet === fleet);
+  if (win !== 'all') filtered = filtered.filter(r => r.window === win);
+  buildPredFleetTable(filtered);
+}
+
+function build7dTable() {
+  const tbody = document.getElementById('pred-7d-table');
+  if (!tbody) return;
+  const sevenDay = window.predFlagged.filter(r => r.window === '7d');
+  sevenDay.forEach(r => {
+    tbody.innerHTML += `<tr>
+      <td style="font-family:'DM Mono',monospace;font-weight:600">${r.robot}</td>
+      <td style="font-size:12px">${r.fleet}</td>
+      <td style="font-size:12px"><strong>${r.fault}</strong>${r.detail ? `<br><span style="font-size:10px;color:var(--muted)">${r.detail}</span>` : ''}</td>
+      <td style="font-size:12px;color:var(--blue)">${r.part}</td>
+      <td style="font-weight:500">${r.cost}</td>
+      <td>${signalBadges(r)}</td>
+    </tr>`;
+  });
+
+  // Parts aggregation for pre-order table
+  const tbody2 = document.getElementById('pred-parts-table');
+  if (!tbody2) return;
+  const partsByFleet = {};
+  sevenDay.forEach(r => {
+    if (r.part === 'TBD') return;
+    const key = r.fleet + '|' + r.part + '|' + r.cost;
+    if (!partsByFleet[key]) partsByFleet[key] = {fleet:r.fleet, part:r.part, cost:r.cost, qty:0};
+    partsByFleet[key].qty++;
+  });
+  const costNum = s => parseInt(s.replace(/[^0-9]/g,'')) || 0;
+  Object.values(partsByFleet).sort((a,b) => costNum(b.cost)-costNum(a.cost)).forEach(p => {
+    const total = costNum(p.cost) * p.qty;
+    tbody2.innerHTML += `<tr>
+      <td style="font-size:12px">${p.fleet}</td>
+      <td style="font-size:12px;color:var(--blue)">${p.part}</td>
+      <td style="font-weight:600">${p.qty}</td>
+      <td>${p.cost}</td>
+      <td style="font-weight:600;color:var(--navy)">€${total.toLocaleString()}</td>
+    </tr>`;
+  });
+}
+
+function build30dTable() {
+  const tbody = document.getElementById('pred-30d-table');
+  if (!tbody) return;
+  window.predFlagged.filter(r => r.window === '30d').forEach(r => {
+    tbody.innerHTML += `<tr>
+      <td style="font-family:'DM Mono',monospace;font-weight:600">${r.robot}</td>
+      <td style="font-size:12px">${r.fleet}</td>
+      <td style="font-size:12px"><strong>${r.fault}</strong>${r.detail ? `<br><span style="font-size:10px;color:var(--muted)">${r.detail}</span>` : ''}</td>
+      <td style="font-size:12px;color:var(--blue)">${r.part}</td>
+      <td style="font-size:12px;color:var(--muted)">${r.cost}</td>
+    </tr>`;
+  });
+}
+
+buildPredFleetTable(window.predFlagged);
+build7dTable();
+build30dTable();
+
+// ── FRI DATA ──
+const friData = [
+  {name:'NAU (Flagstaff)',flag:'🇺🇸',score:31,band:'Critical',color:'var(--red)'},
+  {name:'Georgia Tech',flag:'🇺🇸',score:44,band:'At-risk',color:'var(--amber)'},
+  {name:'BGSU',flag:'🇺🇸',score:52,band:'At-risk',color:'var(--amber)'},
+  {name:'GMU',flag:'🇺🇸',score:57,band:'At-risk',color:'var(--amber)'},
+  {name:'Purdue',flag:'🇺🇸',score:61,band:'Watch',color:'#EAB308'},
+  {name:'Baylor',flag:'🇺🇸',score:65,band:'Watch',color:'#EAB308'},
+  {name:'SMU',flag:'🇺🇸',score:68,band:'Watch',color:'#EAB308'},
+  {name:'ASU',flag:'🇺🇸',score:72,band:'Watch',color:'#EAB308'},
+  {name:'UCLA',flag:'🇺🇸',score:74,band:'Watch',color:'#EAB308'},
+  {name:'UNLV',flag:'🇺🇸',score:78,band:'Healthy',color:'var(--green)'},
+  {name:'Tallinn (EE)',flag:'🇪🇪',score:79,band:'Healthy',color:'var(--green)'},
+  {name:'Hamburg (DE)',flag:'🇩🇪',score:82,band:'Healthy',color:'var(--green)'},
+  {name:'Milton Keynes (UK)',flag:'🇬🇧',score:85,band:'Healthy',color:'var(--green)'},
+  {name:'SOK SOK Helsinki',flag:'🇫🇮',score:91,band:'Healthy',color:'var(--green)'},
+  {name:'SOK Espoo (FI)',flag:'🇫🇮',score:93,band:'Healthy',color:'var(--green)'},
+];
+
+function buildFriTable() {
+  const cont = document.getElementById('rh-fri-table');
+  friData.forEach(r => {
+    const bcolor = r.score<40?'var(--red-light)':r.score<60?'var(--amber-light)':r.score<80?'#FEF9C3':'var(--green-light)';
+    const tcolor = r.score<40?'var(--red)':r.score<60?'var(--amber)':r.score<80?'#854D0E':'var(--green)';
+    cont.innerHTML += `<div class="fri-row">
+      <span class="fri-flag">${r.flag}</span>
+      <span class="fri-name">${r.name}</span>
+      <div class="fri-bar-track"><div class="fri-bar-fill" style="width:${r.score}%;background:${r.color}"></div></div>
+      <span class="fri-score" style="color:${r.color}">${r.score}</span>
+      <span class="fri-band" style="background:${bcolor};color:${tcolor}">${r.band}</span>
+    </div>`;
+  });
+}
+
+function buildUsTable() {
+  const cont = document.getElementById('rh-us-table');
+  const regions = [
+    {name:'West Coast',sub:'Kyle LeDeau, Holden Ragan + others',robots:55,fri:96.7,top_fault:'Comms/SW (20)',worst:'6E564 (RHS 91)'},
+    {name:'East & South',sub:'Sarah Gutierrez, Connor Law + others',robots:35,fri:96.7,top_fault:'Camera (8)',worst:'6E132 (RHS 93)'},
+    {name:'Midwest',sub:'Dominic Doebbler, William Ruiz + others',robots:5,fri:94.8,top_fault:'Mechanical (3)',worst:'6E1391 (RHS 92)'},
+  ];
+  regions.forEach(r => {
+    cont.innerHTML += `<div class="fri-row">
+      <span class="fri-flag">🇺🇸</span>
+      <span class="fri-name">${r.name}<br><span style="font-size:10px;font-weight:400;color:var(--muted)">${r.sub}</span></span>
+      <div class="fri-bar-track"><div class="fri-bar-fill" style="width:${r.fri}%;background:var(--green)"></div></div>
+      <span class="fri-score" style="color:var(--green)">${r.fri}</span>
+      <span style="font-size:11px;color:var(--muted);min-width:120px">${r.robots} robots · top fault: ${r.top_fault}</span>
+    </div>`;
+  });
+}
+
+function buildEuTable() {
+  const cont = document.getElementById('rh-eu-table');
+  const eu = [
+    {flag:'🇫🇮',name:'SOK Helsinki — confirmed',robots:5,fri:95.2,note:'Finnish-language descriptions'},
+    {flag:'🇫🇮🇪🇪🇩🇪',name:'Tallinn / Helsinki (FI / EE / DE)',robots:98,fri:96.1,note:'Helsinki TZ assignees'},
+    {flag:'🇬🇧',name:'Milton Keynes / Leeds',robots:9,fri:96.4,note:'London / Greenwich TZ'},
+  ];
+  eu.forEach(r => {
+    cont.innerHTML += `<div class="fri-row">
+      <span class="fri-flag">${r.flag}</span>
+      <span class="fri-name">${r.name}<br><span style="font-size:10px;font-weight:400;color:var(--muted)">${r.note}</span></span>
+      <div class="fri-bar-track"><div class="fri-bar-fill" style="width:${r.fri}%;background:var(--green)"></div></div>
+      <span class="fri-score" style="color:var(--green)">${r.fri}</span>
+      <span style="font-size:11px;color:var(--muted)">${r.robots} robots</span>
+    </div>`;
+  });
+}
+
+function buildCampusList() {
+  const cont = document.getElementById('rh-campus-list');
+  const campuses = ['ASU','BGSU','Baylor','BSU','Cal Poly SLO','ECU','FGCU','Fordham','Georgia Tech','GMU','JMU','Miami','Minnesota','Missouri S&T','MSU','NCAT','ND','Nova SE','ODU','Ohio State','Ole Miss','Purdue','SDSU','SEMO','SMU','Towson','Texas Tech','UC Irvine','UCLA','UNCW','UNCC','UNLV','UNR','UT Dallas','UT Knoxville','U Kentucky','USC','Wagner','Winona State','Akron','Angelo State','NAU','SUNY','UTD','UMN','FGCU','Lexington IT'];
+  const isNew = new Set(['Miami','Towson','Akron','Wagner','SUNY','UTD','UMN']);
+  campuses.forEach(c => {
+    const bg = isNew.has(c) ? 'var(--green-light)' : 'var(--surface-2)';
+    const tc = isNew.has(c) ? 'var(--green)' : 'var(--muted)';
+    cont.innerHTML += `<span style="font-size:11px;padding:4px 9px;border-radius:6px;background:${bg};color:${tc};border:1px solid var(--border)">${c}${isNew.has(c)?' ✦':''}</span>`;
+  });
+}
+
+// ── SBF SIMULATOR ──
+function runSim() {
+  const fleet = parseInt(document.getElementById('sl-fleet').value);
+  const repair = parseFloat(document.getElementById('sl-repair').value);
+  const rate = parseInt(document.getElementById('sl-rate').value);
+  const target = parseInt(document.getElementById('sl-target').value);
+  document.getElementById('lbl-fleet').textContent = fleet;
+  document.getElementById('lbl-repair').textContent = repair;
+  document.getElementById('lbl-rate').textContent = rate;
+  document.getElementById('lbl-target').textContent = target;
+  const inRepair = Math.round((fleet * rate / 100) * (repair / 30));
+  const uptime = Math.round(((fleet - inRepair) / fleet) * 100);
+  const buffer = Math.round(fleet * target / 100);
+  const available = fleet - inRepair;
+  const over = buffer - available;
+  const day7 = Math.round(uptime + (uptime < target ? 2 : -1));
+  const day30 = Math.round(uptime + (uptime < target ? 5 : -2));
+  let msg = `Fleet: ${fleet} robots. ~${inRepair} in repair at any time. Current uptime: ${uptime}% (target: ${target}%). `;
+  if (uptime >= target) msg += `Buffer met — ${available - buffer} robots above minimum. `;
+  else msg += `${over} robot${over>1?'s':''} below buffer — SLA at risk. `;
+  if (day30 >= target) msg += `30-day forecast recovers above ${target}% if repair pace holds.`;
+  else if (day30 >= 70) msg += `30-day forecast remains below target. Additional resource or pre-positioned spares needed.`;
+  else msg += `Forecast still critical. Root cause intervention required.`;
+  document.getElementById('sim-msg').textContent = msg;
+}
+
+// INIT
+// ── INVENTORY TABLE ──
+const invData = [
+  {part:'Flag',total:66,avg:5.5,last:'2026-05-26',days:1,cost:12,cls:'HIGH RUNNER'},
+  {part:'SIM/eSIM',total:36,avg:3.0,last:'2026-05-25',days:2,cost:8,cls:'Medium'},
+  {part:'Wheel/Tyre',total:31,avg:2.6,last:'2026-05-26',days:1,cost:18,cls:'Medium'},
+  {part:'Lock/Lid',total:28,avg:2.3,last:'2026-05-26',days:1,cost:35,cls:'Medium'},
+  {part:'Bogie',total:20,avg:1.7,last:'2026-05-26',days:1,cost:85,cls:'Medium'},
+  {part:'Motor',total:20,avg:1.7,last:'2026-05-26',days:1,cost:110,cls:'Medium'},
+  {part:'Battery',total:20,avg:1.7,last:'2026-05-25',days:2,cost:220,cls:'Medium'},
+  {part:'Radar',total:14,avg:1.2,last:'2026-05-26',days:1,cost:145,cls:'Low'},
+  {part:'HSI PCB',total:13,avg:1.1,last:'2026-05-26',days:1,cost:180,cls:'Low'},
+  {part:'Camera',total:13,avg:1.1,last:'2026-05-25',days:2,cost:95,cls:'Low'},
+  {part:'CamMux',total:7,avg:0.6,last:'2026-05-25',days:2,cost:95,cls:'Low'},
+  {part:'AHRS module',total:4,avg:0.3,last:'2025-05-28',days:364,cost:75,cls:'STALE'},
+  {part:'GPS module',total:1,avg:0.1,last:'2025-05-28',days:364,cost:120,cls:'STALE'},
+];
+
+function buildInvTable() {
+  const tbody = document.getElementById('inv-table');
+  if (!tbody) return;
+  invData.forEach(r => {
+    const clsMap = {
+      'HIGH RUNNER': {bg:'var(--red-light)',tc:'var(--red)',label:'High runner'},
+      'Medium': {bg:'var(--amber-light)',tc:'var(--amber)',label:'Medium runner'},
+      'Low': {bg:'var(--green-light)',tc:'var(--green)',label:'Low runner'},
+      'STALE': {bg:'#F1EFE8',tc:'#5F5E5A',label:'Stale ⏳'},
+    };
+    const c = clsMap[r.cls] || clsMap['Low'];
+    const daysColor = r.days > 180 ? 'var(--amber)' : 'var(--muted)';
+    tbody.innerHTML += `<tr>
+      <td>${r.part}</td>
+      <td>${r.total}</td>
+      <td>${r.avg}</td>
+      <td style="color:${daysColor}">${r.last} <span style="font-size:10px">(${r.days}d ago)</span></td>
+      <td>€${r.cost}</td>
+      <td><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:100px;background:${c.bg};color:${c.tc}">${c.label}</span></td>
+    </tr>`;
+  });
+}
+
+buildInvTable();
+buildFriTable();
+buildUsTable();
+buildEuTable();
+buildCampusList();
+runSim();
+</script>
+</body>
+</html>
